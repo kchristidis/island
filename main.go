@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 
+	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 	"github.com/kchristidis/exp2/blockchain"
 )
 
@@ -40,6 +42,47 @@ func run() error {
 	if err := sc.Install(); err != nil {
 		return err
 	}
+
+	// Get notified when a new block is added to the peer's chain
+
+	heightChan := make(chan uint64)
+	doneChan := make(chan struct{})
+
+	go func() {
+		var lastHeight uint64
+		var resp *fab.BlockchainInfoResponse
+		var err error
+		for {
+			resp, err = sc.LedgerClient.QueryInfo()
+			if err != nil {
+				msg := fmt.Sprintf("Unable to query ledger: %s", err.Error())
+				fmt.Fprintln(os.Stdout, msg)
+				close(doneChan)
+				return
+			}
+			if tempHeight := resp.BCI.GetHeight(); tempHeight != lastHeight {
+				lastHeight = tempHeight
+				heightChan <- lastHeight
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}()
+
+	go func() {
+		for {
+			select {
+			case val := <-heightChan:
+				fmt.Fprintf(os.Stdout, ">>> current blockchain height: %d\n", val)
+			case <-doneChan:
+				fmt.Fprintln(os.Stdout, "Goroutine exiting")
+				return
+			}
+		}
+	}()
+
+	defer close(doneChan)
+
+	// Start the simulation
 
 	println()
 

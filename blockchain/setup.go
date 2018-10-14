@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/hyperledger/fabric-sdk-go/pkg/client/ledger"
+
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/event"
 	mspclient "github.com/hyperledger/fabric-sdk-go/pkg/client/msp"
@@ -37,6 +39,7 @@ type SDKContext struct {
 	RMClient      *resmgmt.Client
 	ChannelClient *channel.Client
 	EventClient   *event.Client
+	LedgerClient  *ledger.Client
 }
 
 // Setup ...
@@ -149,6 +152,13 @@ func (sc *SDKContext) Install() error {
 	}
 	sc.EventClient = ec
 	fmt.Fprintln(os.Stdout, "Event client created")
+
+	lc, err := ledger.New(cc)
+	if err != nil {
+		return fmt.Errorf("Failed to create ledger client: %s", err)
+	}
+	sc.LedgerClient = lc
+	fmt.Fprintln(os.Stdout, "Ledger client created")
 
 	fmt.Fprintln(os.Stdout, "Chaincode installation & instantiation completed")
 	return nil
