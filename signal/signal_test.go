@@ -1,41 +1,57 @@
 package signal
 
 import (
-	"sync"
 	"testing"
 
 	"github.com/onsi/gomega/gbytes"
+	"github.com/stretchr/testify/require"
 
 	. "github.com/onsi/gomega"
 )
 
 func TestSignal(t *testing.T) {
 	g := NewGomegaWithT(t)
+
+	srcChan := make(chan uint64)
+	doneChan := make(chan struct{})
 	bfr := gbytes.NewBuffer()
-	clc := make(chan struct{})
-	src := make(chan uint64)
-
-	s := &Signal{
-		Source:  src,
-		Close:   clc,
-		Cond:    sync.NewCond(&sync.Mutex{}),
-		LastVal: 0,
-		Out:     bfr,
-	}
-
+	s := New(srcChan, doneChan, bfr)
 	go s.Run()
 
-	finalVal := uint64(1)
+	t.Run("register", func(t *testing.T) {
+		require.True(t, s.Register(1, make(chan uint64, 1)))
+		_, ok := s.Subs.Load(1)
+		require.True(t, ok)
+		require.False(t, s.Register(1, make(chan uint64, 1)))
+	})
 
-	go func() {
-		src <- finalVal
-	}()
+	t.Run("run", func(t *testing.T) {
+		finalVal := uint64(1)
+		go func() { // Producer
+			srcChan <- finalVal
+		}()
 
-	g.Eventually(func() uint64 {
-		return s.LastVal
-	}, "1s", "50ms").Should(Equal(finalVal))
+		var rxVal uint64
+		go func() { // Subscriber
+			ch, _ := s.Subs.Load(1)
+			rxVal = <-ch.(chan uint64)
+		}()
 
-	close(clc)
+		// Signal gets set properly
+		g.Eventually(func() uint64 {
+			return s.LastVal
+		}, "1s", "50ms").Should(Equal(finalVal))
 
-	g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say(ExitMsg))
+		// Subscriber gets set properly
+		g.Eventually(func() uint64 {
+			return rxVal
+		}, "1s", "50ms").Should(Equal(finalVal))
+	})
+
+	t.Run("close", func(t *testing.T) {
+		close(doneChan)
+
+		// Signal closes properly
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say(ExitMsg))
+	})
 }
