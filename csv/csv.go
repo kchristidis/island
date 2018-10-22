@@ -3,7 +3,9 @@ package csv
 import (
 	"bytes"
 	"encoding/csv"
+	"fmt"
 	"io/ioutil"
+	"strconv"
 )
 
 // Filename ...
@@ -37,7 +39,7 @@ var IDs = []int{
 }
 
 // Load ...
-func Load(fname string) (map[string][][]string, error) {
+func Load(fname string) (map[int][][]float64, error) {
 	b, err := ioutil.ReadFile(Filename)
 	if err != nil {
 		return nil, err
@@ -62,5 +64,41 @@ func Load(fname string) (map[string][][]string, error) {
 		m[recs[i*RowCount][DataID]] = recs[i*RowCount : (i+1)*RowCount]
 	}
 
-	return m, nil
+	return Convert(m)
+}
+
+// Convert ...
+func Convert(m1 map[string][][]string) (map[int][][]float64, error) {
+	m2 := make(map[int][][]float64)
+
+	for k1, v1 := range m1 {
+		k2, err := strconv.Atoi(k1)
+		if err != nil {
+			return nil, err
+		}
+
+		v2 := make([][]float64, len(v1))
+		for row := 0; row < len(v1); row++ {
+			auxFlt := make([]float64, ColCount-1)
+			auxStr := make([]string, ColCount-1)
+			v2[row] = make([]float64, ColCount-1) // drop the DataID column from v1
+
+			var err error
+			for col := 0; col < ColCount-1; col++ {
+				auxFlt[col], err = strconv.ParseFloat(v1[row][col+1], 64)
+				if err != nil {
+					return nil, err
+				}
+				auxStr[col] = fmt.Sprintf("%.3f", auxFlt[col])
+				v2[row][col], err = strconv.ParseFloat(auxStr[col], 64)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+
+		m2[k2] = v2
+	}
+
+	return m2, nil
 }

@@ -7,6 +7,8 @@ import (
 	"io/ioutil"
 	"strconv"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestLoadTrace(t *testing.T) {
@@ -75,4 +77,26 @@ func TestLoadTrace(t *testing.T) {
 		}
 
 	})
+}
+
+func TestConversion(t *testing.T) {
+	m1 := map[string][][]string{
+		"171": [][]string{
+			[]string{"171", "-0.005", "0.8782666666666666", "0.8782666666666666", "3.4", "10.84"},
+		},
+	}
+
+	m2exp := map[int][][]float64{
+		171: [][]float64{
+			[]float64{-0.005, 0.878, 0.878, 3.4, 10.84},
+		},
+	}
+
+	m2act, err := Convert(m1)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(m2act[171]))
+	require.Equal(t, ColCount-1, len(m2act[171][0]))
+	require.InDeltaSlice(t, m2exp[171][0], m2act[171][0], 0.0001)
+	t.Log(m1["171"][0])
+	t.Log(m2act[171][0])
 }
