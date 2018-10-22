@@ -9,26 +9,24 @@ import (
 // ExitMsg ...
 const ExitMsg = "Signal exited"
 
-// BufferLen ...
-const BufferLen = 1000
-
 // Signal ...
 type Signal struct {
-	Source  <-chan uint64
-	Done    <-chan struct{}
-	Out     io.Writer
-	LastVal uint64
-	Subs    *sync.Map
-	once    sync.Once
+	DoneChan   <-chan struct{}
+	LastVal    uint64
+	Out        io.Writer
+	SourceChan <-chan uint64
+	Subs       *sync.Map
+
+	once sync.Once
 }
 
 // New ...
 func New(srcChan chan uint64, doneChan chan struct{}, out io.Writer) *Signal {
 	return &Signal{
-		Source: srcChan,
-		Done:   doneChan,
-		Out:    out,
-		Subs:   new(sync.Map),
+		DoneChan:   doneChan,
+		Out:        out,
+		SourceChan: srcChan,
+		Subs:       new(sync.Map),
 	}
 }
 
@@ -44,9 +42,9 @@ func (s *Signal) Run() {
 
 	for {
 		select {
-		case <-s.Done:
+		case <-s.DoneChan:
 			return
-		case newVal := <-s.Source:
+		case newVal := <-s.SourceChan:
 			if newVal > s.LastVal {
 				s.LastVal = newVal
 				s.Subs.Range(func(k, v interface{}) bool {
