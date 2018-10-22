@@ -24,7 +24,7 @@ const (
 	Gen
 	Grid
 	Use
-	Low
+	Lo
 	Hi
 )
 
