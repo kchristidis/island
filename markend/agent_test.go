@@ -1,46 +1,46 @@
-package marker_test
+package markend_test
 
 import (
 	"errors"
 	"testing"
 
-	"github.com/kchristidis/exp2/marker"
-	"github.com/kchristidis/exp2/marker/markerfakes"
+	"github.com/kchristidis/exp2/markend"
+	"github.com/kchristidis/exp2/markend/markendfakes"
 	"github.com/onsi/gomega/gbytes"
 
 	. "github.com/onsi/gomega"
 )
 
-func TestMarker(t *testing.T) {
+func TestMarkend(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	t.Run("slotter registration fails", func(t *testing.T) {
-		sdk := new(markerfakes.FakeSDKer)
-		slotsrc := new(markerfakes.FakeSlotter)
+	t.Run("notifier registration fails", func(t *testing.T) {
+		sdkctx := new(markendfakes.FakeSDKer)
+		slotnotifier := new(markendfakes.FakeNotifier)
 		bfr := gbytes.NewBuffer()
 
-		m := marker.New(3, sdk, slotsrc, make(chan struct{}), bfr)
+		m := markend.New(3, sdkctx, slotnotifier, make(chan struct{}), bfr)
 
-		slotsrc.RegisterReturns(false)
+		slotnotifier.RegisterReturns(false)
 
 		var err error
 		go func() {
 			err = m.Run()
 		}()
 
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Marker exited"))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Markend agent exited"))
 		g.Eventually(err, "1s", "50ms").Should(HaveOccurred())
 	})
 
 	t.Run("done chan closes", func(t *testing.T) {
-		sdk := new(markerfakes.FakeSDKer)
-		slotsrc := new(markerfakes.FakeSlotter)
+		sdkctx := new(markendfakes.FakeSDKer)
+		slotnotifier := new(markendfakes.FakeNotifier)
 		donec := make(chan struct{})
 		bfr := gbytes.NewBuffer()
 
-		m := marker.New(3, sdk, slotsrc, donec, bfr)
+		m := markend.New(3, sdkctx, slotnotifier, donec, bfr)
 
-		slotsrc.RegisterReturns(true)
+		slotnotifier.RegisterReturns(true)
 
 		var err error
 		go func() {
@@ -49,19 +49,19 @@ func TestMarker(t *testing.T) {
 
 		close(donec)
 
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Marker exited"))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Markend agent exited"))
 		g.Expect(err).ToNot(HaveOccurred())
 	})
 
-	t.Run("slotter works fine", func(t *testing.T) {
-		sdk := new(markerfakes.FakeSDKer)
-		slotsrc := new(markerfakes.FakeSlotter)
+	t.Run("notifier works fine", func(t *testing.T) {
+		sdkctx := new(markendfakes.FakeSDKer)
+		slotnotifier := new(markendfakes.FakeNotifier)
 		donec := make(chan struct{})
 		bfr := gbytes.NewBuffer()
 
-		m := marker.New(3, sdk, slotsrc, donec, bfr)
+		m := markend.New(3, sdkctx, slotnotifier, donec, bfr)
 
-		slotsrc.RegisterReturns(true)
+		slotnotifier.RegisterReturns(true)
 
 		go func() {
 			m.Run()
@@ -71,11 +71,11 @@ func TestMarker(t *testing.T) {
 
 		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Processing slot 0"))
 
-		sdk.InvokeReturns(nil, nil)
+		sdkctx.InvokeReturns(nil, nil)
 		m.SlotQueue <- 2
 		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Invoking 'markEnd' for slot 2"))
 
-		sdk.InvokeReturns(nil, errors.New("foo"))
+		sdkctx.InvokeReturns(nil, errors.New("foo"))
 		m.SlotQueue <- 5
 		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Unable to invoke 'markEnd' for slot 5:"))
 
