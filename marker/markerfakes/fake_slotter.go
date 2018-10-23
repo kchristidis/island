@@ -8,11 +8,11 @@ import (
 )
 
 type FakeSlotter struct {
-	RegisterStub        func(int, chan uint64) bool
+	RegisterStub        func(int, chan int) bool
 	registerMutex       sync.RWMutex
 	registerArgsForCall []struct {
 		arg1 int
-		arg2 chan uint64
+		arg2 chan int
 	}
 	registerReturns struct {
 		result1 bool
@@ -24,12 +24,12 @@ type FakeSlotter struct {
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakeSlotter) Register(arg1 int, arg2 chan uint64) bool {
+func (fake *FakeSlotter) Register(arg1 int, arg2 chan int) bool {
 	fake.registerMutex.Lock()
 	ret, specificReturn := fake.registerReturnsOnCall[len(fake.registerArgsForCall)]
 	fake.registerArgsForCall = append(fake.registerArgsForCall, struct {
 		arg1 int
-		arg2 chan uint64
+		arg2 chan int
 	}{arg1, arg2})
 	fake.recordInvocation("Register", []interface{}{arg1, arg2})
 	fake.registerMutex.Unlock()
@@ -49,13 +49,13 @@ func (fake *FakeSlotter) RegisterCallCount() int {
 	return len(fake.registerArgsForCall)
 }
 
-func (fake *FakeSlotter) RegisterCalls(stub func(int, chan uint64) bool) {
+func (fake *FakeSlotter) RegisterCalls(stub func(int, chan int) bool) {
 	fake.registerMutex.Lock()
 	defer fake.registerMutex.Unlock()
 	fake.RegisterStub = stub
 }
 
-func (fake *FakeSlotter) RegisterArgsForCall(i int) (int, chan uint64) {
+func (fake *FakeSlotter) RegisterArgsForCall(i int) (int, chan int) {
 	fake.registerMutex.RLock()
 	defer fake.registerMutex.RUnlock()
 	argsForCall := fake.registerArgsForCall[i]

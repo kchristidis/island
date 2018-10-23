@@ -20,7 +20,7 @@ type SDKer interface {
 // Slotter ...
 //go:generate counterfeiter . Slotter
 type Slotter interface {
-	Register(id int, queue chan uint64) bool
+	Register(id int, queue chan int) bool
 }
 
 // Marker ...
@@ -31,7 +31,7 @@ type Marker struct {
 	Period     int
 	SDK        SDKer
 	SlotSource Slotter
-	SlotQueue  chan uint64
+	SlotQueue  chan int
 	Out        io.Writer
 }
 
@@ -44,7 +44,7 @@ func New(period int, sdkContext SDKer, slotSource Slotter, doneChan chan struct{
 		Period:     period,
 		SDK:        sdkContext,
 		SlotSource: slotSource,
-		SlotQueue:  make(chan uint64, BufferLen),
+		SlotQueue:  make(chan int, BufferLen),
 		Out:        out,
 	}
 }
@@ -77,12 +77,12 @@ func (m *Marker) Run() error {
 	for {
 		select {
 		case slot := <-m.SlotQueue:
-			msg := fmt.Sprintf("[%d] Processing slot %d", m.ID, int(slot))
+			msg := fmt.Sprintf("[%d] Processing slot %d", m.ID, slot)
 			fmt.Fprintln(m.Out, msg)
 
-			if (int(slot)+1)%m.Period == 0 { // We add 1 because slot 0 is the 1st slot
+			if (slot+1)%m.Period == 0 { // We add 1 because slot 0 is the 1st slot
 				select {
-				case m.MarkQueue <- int(slot):
+				case m.MarkQueue <- slot:
 				default:
 					msg := fmt.Sprintf("[%d] Unable to push slot %d to 'mark' queue (size: %d)", m.ID, slot, len(m.MarkQueue))
 					fmt.Fprintln(m.Out, msg)

@@ -67,20 +67,20 @@ func TestMarker(t *testing.T) {
 			m.Run()
 		}()
 
-		m.SlotQueue <- uint64(0)
+		m.SlotQueue <- 0
 
 		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Processing slot 0"))
 
 		sdk.InvokeReturns(nil, nil)
-		m.SlotQueue <- uint64(2)
+		m.SlotQueue <- 2
 		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Invoking 'markEnd' for slot 2"))
 
 		sdk.InvokeReturns(nil, errors.New("foo"))
-		m.SlotQueue <- uint64(5)
+		m.SlotQueue <- 5
 		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Unable to invoke 'markEnd' for slot 5:"))
 
 		m.MarkQueue = nil
-		m.SlotQueue <- uint64(8)
+		m.SlotQueue <- 8
 		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Unable to push slot 8 to 'mark' queue"))
 
 		close(donec)
