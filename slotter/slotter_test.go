@@ -1,4 +1,4 @@
-package signal
+package slotter
 
 import (
 	"testing"
@@ -9,7 +9,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestSignal(t *testing.T) {
+func TestSlotter(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	srcChan := make(chan uint64)

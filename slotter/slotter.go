@@ -1,4 +1,4 @@
-package signal
+package slotter
 
 import (
 	"fmt"
@@ -9,8 +9,8 @@ import (
 // ExitMsg ...
 const ExitMsg = "Signal exited"
 
-// Signal ...
-type Signal struct {
+// Slotter ...
+type Slotter struct {
 	DoneChan   <-chan struct{}
 	LastVal    uint64
 	Out        io.Writer
@@ -21,8 +21,8 @@ type Signal struct {
 }
 
 // New ...
-func New(srcChan chan uint64, doneChan chan struct{}, out io.Writer) *Signal {
-	return &Signal{
+func New(srcChan chan uint64, doneChan chan struct{}, out io.Writer) *Slotter {
+	return &Slotter{
 		DoneChan:   doneChan,
 		Out:        out,
 		SourceChan: srcChan,
@@ -31,13 +31,13 @@ func New(srcChan chan uint64, doneChan chan struct{}, out io.Writer) *Signal {
 }
 
 // Register ...
-func (s *Signal) Register(id int, queue chan uint64) bool {
+func (s *Slotter) Register(id int, queue chan uint64) bool {
 	_, loaded := s.Subs.LoadOrStore(id, queue)
 	return !loaded
 }
 
 // Run ...
-func (s *Signal) Run() {
+func (s *Slotter) Run() {
 	defer fmt.Fprintln(s.Out, ExitMsg)
 
 	for {
