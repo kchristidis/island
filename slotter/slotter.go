@@ -12,16 +12,16 @@ const ExitMsg = "Signal exited"
 // Slotter ...
 type Slotter struct {
 	DoneChan   <-chan struct{}
-	LastVal    uint64
+	LastVal    int
 	Out        io.Writer
-	SourceChan <-chan uint64
+	SourceChan <-chan int
 	Subs       *sync.Map
 
 	once sync.Once
 }
 
 // New ...
-func New(srcChan chan uint64, doneChan chan struct{}, out io.Writer) *Slotter {
+func New(srcChan chan int, doneChan chan struct{}, out io.Writer) *Slotter {
 	return &Slotter{
 		DoneChan:   doneChan,
 		Out:        out,
@@ -31,7 +31,7 @@ func New(srcChan chan uint64, doneChan chan struct{}, out io.Writer) *Slotter {
 }
 
 // Register ...
-func (s *Slotter) Register(id int, queue chan uint64) bool {
+func (s *Slotter) Register(id int, queue chan int) bool {
 	_, loaded := s.Subs.LoadOrStore(id, queue)
 	return !loaded
 }
@@ -49,7 +49,7 @@ func (s *Slotter) Run() {
 				s.LastVal = newVal
 				s.Subs.Range(func(k, v interface{}) bool {
 					select {
-					case v.(chan uint64) <- s.LastVal:
+					case v.(chan int) <- s.LastVal:
 						return true
 					default:
 						return false
