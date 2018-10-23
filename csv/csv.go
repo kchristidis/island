@@ -40,7 +40,7 @@ var IDs = []int{
 
 // Load ...
 func Load(fname string) (map[int][][]float64, error) {
-	b, err := ioutil.ReadFile(Filename)
+	b, err := ioutil.ReadFile(fname)
 	if err != nil {
 		return nil, err
 	}
