@@ -13,8 +13,6 @@ type Slotter struct {
 	Out        io.Writer
 	SourceChan <-chan int
 	Subs       *sync.Map
-
-	once sync.Once
 }
 
 // New ...
