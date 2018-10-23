@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
-	"sync"
 )
 
 // BufferLen ...
@@ -32,40 +31,37 @@ type SDKer interface {
 	Invoke(slot int, action string, dataB []byte) ([]byte, error)
 }
 
-// Signaler ...
-//go:generate counterfeiter . Signaler
-type Signaler interface {
+// Slotter ...
+//go:generate counterfeiter . Slotter
+type Slotter interface {
 	Register(id int, queue chan uint64) bool
 }
 
 // Agent ...
 type Agent struct {
-	BuyQueue    chan int
-	DoneChan    chan struct{}
-	ID          int
-	SDK         SDKer
-	SellQueue   chan int
-	Signal      Signaler
-	SignalQueue chan uint64
-	Out         io.Writer
-	Trace       [][]float64
-
-	once  sync.Once
-	first int // The block number that corresponds to the first row in the trace
+	BuyQueue   chan int
+	DoneChan   chan struct{}
+	ID         int
+	SDK        SDKer
+	SellQueue  chan int
+	SlotQueue  chan uint64
+	SlotSource Slotter
+	Out        io.Writer
+	Trace      [][]float64
 }
 
 // New ...
-func New(id int, trace [][]float64, sdkContext SDKer, signal Signaler, doneChan chan struct{}, out io.Writer) *Agent {
+func New(id int, trace [][]float64, sdkContext SDKer, slotSource Slotter, doneChan chan struct{}, out io.Writer) *Agent {
 	return &Agent{
-		BuyQueue:    make(chan int, BufferLen),
-		DoneChan:    doneChan,
-		ID:          id,
-		SellQueue:   make(chan int, BufferLen),
-		SDK:         sdkContext,
-		Signal:      signal,
-		SignalQueue: make(chan uint64, BufferLen),
-		Out:         out,
-		Trace:       trace,
+		BuyQueue:   make(chan int, BufferLen),
+		DoneChan:   doneChan,
+		ID:         id,
+		SellQueue:  make(chan int, BufferLen),
+		SDK:        sdkContext,
+		SlotQueue:  make(chan uint64, BufferLen),
+		SlotSource: slotSource,
+		Out:        out,
+		Trace:      trace,
 	}
 }
 
@@ -74,7 +70,7 @@ func (a *Agent) Run() error {
 	msg := fmt.Sprintf("[%d] Agent exited", a.ID)
 	defer fmt.Fprintln(a.Out, msg)
 
-	if ok := a.Signal.Register(a.ID, a.SignalQueue); !ok {
+	if ok := a.SlotSource.Register(a.ID, a.SlotQueue); !ok {
 		return fmt.Errorf("[%d] Unable to register with signaler", a.ID)
 	}
 
@@ -102,12 +98,8 @@ func (a *Agent) Run() error {
 
 	for {
 		select {
-		case blockNumber := <-a.SignalQueue:
-			a.once.Do(func() {
-				a.first = int(blockNumber)
-			})
-
-			rowIdx := int(blockNumber) - a.first
+		case slot := <-a.SlotQueue:
+			rowIdx := int(slot)
 			msg := fmt.Sprintf("[%d] Processing row %d: %v", a.ID, rowIdx, a.Trace[rowIdx])
 			fmt.Fprintln(a.Out, msg)
 

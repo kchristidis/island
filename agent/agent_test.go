@@ -22,14 +22,14 @@ func TestAgent(t *testing.T) {
 	require.NoError(t, err)
 	t.Log(m[csv.IDs[0]][0])
 
-	t.Run("signal registration errors", func(t *testing.T) {
+	t.Run("slotter registration fails", func(t *testing.T) {
 		sdk := new(agentfakes.FakeSDKer)
-		signal := new(agentfakes.FakeSignaler)
+		slotsrc := new(agentfakes.FakeSlotter)
 		bfr := gbytes.NewBuffer()
 
-		a := agent.New(csv.IDs[0], m[csv.IDs[0]], sdk, signal, make(chan struct{}), bfr)
+		a := agent.New(csv.IDs[0], m[csv.IDs[0]], sdk, slotsrc, make(chan struct{}), bfr)
 
-		signal.RegisterReturns(false)
+		slotsrc.RegisterReturns(false)
 
 		var err error
 		go func() {
@@ -40,55 +40,55 @@ func TestAgent(t *testing.T) {
 		g.Eventually(err, "1s", "50ms").Should(HaveOccurred())
 	})
 
-	t.Run("close done chan", func(t *testing.T) {
+	t.Run("done chan closes", func(t *testing.T) {
 		sdk := new(agentfakes.FakeSDKer)
-		signal := new(agentfakes.FakeSignaler)
-		doneChan := make(chan struct{})
+		slotsrc := new(agentfakes.FakeSlotter)
+		donec := make(chan struct{})
 		bfr := gbytes.NewBuffer()
 
-		a := agent.New(csv.IDs[0], m[csv.IDs[0]], sdk, signal, doneChan, bfr)
+		a := agent.New(csv.IDs[0], m[csv.IDs[0]], sdk, slotsrc, donec, bfr)
 
-		signal.RegisterReturns(true)
+		slotsrc.RegisterReturns(true)
 
 		var err error
 		go func() {
 			err = a.Run()
 		}()
 
-		close(doneChan)
+		close(donec)
 
 		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Agent exited"))
 		g.Expect(err).ToNot(HaveOccurred())
 	})
 
-	t.Run("signal works fine", func(t *testing.T) {
+	t.Run("slotter works fine", func(t *testing.T) {
 		sdk := new(agentfakes.FakeSDKer)
-		signal := new(agentfakes.FakeSignaler)
-		doneChan := make(chan struct{})
+		slotsrc := new(agentfakes.FakeSlotter)
+		donec := make(chan struct{})
 		bfr := gbytes.NewBuffer()
 
-		a := agent.New(csv.IDs[0], m[csv.IDs[0]], sdk, signal, doneChan, bfr)
+		a := agent.New(csv.IDs[0], m[csv.IDs[0]], sdk, slotsrc, donec, bfr)
 
-		signal.RegisterReturns(true)
+		slotsrc.RegisterReturns(true)
 		sdk.InvokeReturns(nil, nil)
 
 		go func() {
 			a.Run()
 		}()
 
-		a.SignalQueue <- uint64(0)
+		a.SlotQueue <- uint64(0)
 
 		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Processing row 0:"))
 		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Invoking 'buy' for"))
 
 		sdk.InvokeReturns(nil, errors.New("foo"))
-		a.SignalQueue <- uint64(0)
+		a.SlotQueue <- uint64(1)
 		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Unable to invoke 'buy' for"))
 
 		a.BuyQueue = nil
-		a.SignalQueue <- uint64(0)
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Unable to push row 0 to 'buy' queue"))
+		a.SlotQueue <- uint64(2)
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Unable to push row 2 to 'buy' queue"))
 
-		close(doneChan)
+		close(donec)
 	})
 }
