@@ -109,20 +109,20 @@ func (a *Agent) Run() error {
 
 			rowIdx := int(blockNumber) - a.first
 			msg := fmt.Sprintf("[%d] Processing row %d: %v", a.ID, rowIdx, a.Trace[rowIdx])
-			fmt.Fprintf(a.Out, msg)
+			fmt.Fprintln(a.Out, msg)
 
 			select {
 			case a.BuyQueue <- rowIdx:
 			default:
-				msg := fmt.Sprintf("[%d] Unable to push row %d to 'buy' queue (size: %d)\n", a.ID, rowIdx, len(a.BuyQueue))
-				fmt.Fprintf(a.Out, msg)
+				msg := fmt.Sprintf("[%d] Unable to push row %d to 'buy' queue (size: %d)", a.ID, rowIdx, len(a.BuyQueue))
+				fmt.Fprintln(a.Out, msg)
 			}
 
 			select {
 			case a.SellQueue <- rowIdx:
 			default:
-				msg := fmt.Sprintf("[%d] Unable to push row %d to 'sell' queue (size: %d)\n", a.ID, rowIdx, len(a.BuyQueue))
-				fmt.Fprintf(a.Out, msg)
+				msg := fmt.Sprintf("[%d] Unable to push row %d to 'sell' queue (size: %d)", a.ID, rowIdx, len(a.BuyQueue))
+				fmt.Fprintln(a.Out, msg)
 			}
 		case <-a.DoneChan:
 			return nil
@@ -137,10 +137,10 @@ func (a *Agent) Buy(rowIdx int) {
 		ppu := row[Lo] + (row[Hi]-row[Lo])*(1.0-rand.Float64())
 		bid, _ := json.Marshal([]float64{ppu, row[Use] * ToKWh}) // first arg: PPU, second arg: QTY
 		msg := fmt.Sprintf("[%d] Invoking 'buy' for %.3f kWh (%.3f) at %.3f ç/kWh", a.ID, row[Use]*ToKWh, row[Use], ppu)
-		fmt.Fprintf(a.Out, msg)
+		fmt.Fprintln(a.Out, msg)
 		if _, err := a.SDK.Invoke(rowIdx, "buy", bid); err != nil {
 			msg := fmt.Sprintf("[%d] Unable to invoke 'buy' for row %d: %s\n", a.ID, rowIdx, err)
-			fmt.Fprintf(a.Out, msg)
+			fmt.Fprintln(a.Out, msg)
 		}
 
 	}
@@ -153,10 +153,10 @@ func (a *Agent) Sell(rowIdx int) {
 		ppu := row[Lo] + (row[Hi]-row[Lo])*(1.0-rand.Float64())
 		bid, _ := json.Marshal([]float64{ppu, row[Gen] * ToKWh}) // first arg: PPU, second arg: QTY
 		msg := fmt.Sprintf("[%d] Invoking 'sell' for %.3f kWh (%.3f) at %.3f ç/kWh", a.ID, row[Gen]*ToKWh, row[Gen], ppu)
-		fmt.Fprintf(a.Out, msg)
+		fmt.Fprintln(a.Out, msg)
 		if _, err := a.SDK.Invoke(rowIdx, "sell", bid); err != nil {
-			msg := fmt.Sprintf("[%d] Unable to invoke 'sell' for row %d: %s\n", a.ID, rowIdx, err)
-			fmt.Fprintf(a.Out, msg)
+			msg := fmt.Sprintf("[%d] Unable to invoke 'sell' for row %d: %s", a.ID, rowIdx, err)
+			fmt.Fprintln(a.Out, msg)
 		}
 	}
 }
