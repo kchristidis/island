@@ -6,9 +6,6 @@ import (
 	"sync"
 )
 
-// ExitMsg ...
-const ExitMsg = "Signal exited"
-
 // Slotter ...
 type Slotter struct {
 	DoneChan   <-chan struct{}
@@ -38,7 +35,7 @@ func (s *Slotter) Register(id int, queue chan int) bool {
 
 // Run ...
 func (s *Slotter) Run() {
-	defer fmt.Fprintln(s.Out, ExitMsg)
+	defer fmt.Fprintln(s.Out, "Slotter exited")
 
 	for {
 		select {

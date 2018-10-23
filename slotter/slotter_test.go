@@ -52,6 +52,6 @@ func TestSlotter(t *testing.T) {
 		close(doneChan)
 
 		// Signal closes properly
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say(ExitMsg))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Slotter exited"))
 	})
 }
