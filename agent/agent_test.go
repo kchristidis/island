@@ -76,17 +76,17 @@ func TestAgent(t *testing.T) {
 			a.Run()
 		}()
 
-		a.SlotQueue <- uint64(0)
+		a.SlotQueue <- 0
 
 		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Processing row 0:"))
 		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Invoking 'buy' for"))
 
 		sdk.InvokeReturns(nil, errors.New("foo"))
-		a.SlotQueue <- uint64(1)
+		a.SlotQueue <- 1
 		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Unable to invoke 'buy' for"))
 
 		a.BuyQueue = nil
-		a.SlotQueue <- uint64(2)
+		a.SlotQueue <- 2
 		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Unable to push row 2 to 'buy' queue"))
 
 		close(donec)

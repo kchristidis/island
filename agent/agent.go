@@ -34,7 +34,7 @@ type SDKer interface {
 // Slotter ...
 //go:generate counterfeiter . Slotter
 type Slotter interface {
-	Register(id int, queue chan uint64) bool
+	Register(id int, queue chan int) bool
 }
 
 // Agent ...
@@ -44,7 +44,7 @@ type Agent struct {
 	ID         int
 	SDK        SDKer
 	SellQueue  chan int
-	SlotQueue  chan uint64
+	SlotQueue  chan int
 	SlotSource Slotter
 	Out        io.Writer
 	Trace      [][]float64
@@ -58,7 +58,7 @@ func New(id int, trace [][]float64, sdkContext SDKer, slotSource Slotter, doneCh
 		ID:         id,
 		SellQueue:  make(chan int, BufferLen),
 		SDK:        sdkContext,
-		SlotQueue:  make(chan uint64, BufferLen),
+		SlotQueue:  make(chan int, BufferLen),
 		SlotSource: slotSource,
 		Out:        out,
 		Trace:      trace,
