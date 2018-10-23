@@ -3,7 +3,6 @@ package marker
 import (
 	"fmt"
 	"io"
-	"sync"
 )
 
 // ID ...
@@ -18,38 +17,35 @@ type SDKer interface {
 	Invoke(slot int, action string, dataB []byte) ([]byte, error)
 }
 
-// Signaler ...
-//go:generate counterfeiter . Signaler
-type Signaler interface {
+// Slotter ...
+//go:generate counterfeiter . Slotter
+type Slotter interface {
 	Register(id int, queue chan uint64) bool
 }
 
 // Marker ...
 type Marker struct {
-	DoneChan    chan struct{}
-	MarkQueue   chan int
-	Period      int
-	SDK         SDKer
-	Signal      Signaler
-	SignalQueue chan uint64
-	Out         io.Writer
-
-	ID    int
-	first int // The block number that corresponds to the first row in the trace
-	once  sync.Once
+	DoneChan   chan struct{}
+	ID         int
+	MarkQueue  chan int
+	Period     int
+	SDK        SDKer
+	SlotSource Slotter
+	SlotQueue  chan uint64
+	Out        io.Writer
 }
 
 // New ...
-func New(period int, sdkContext SDKer, signal Signaler, doneChan chan struct{}, out io.Writer) *Marker {
+func New(period int, sdkContext SDKer, slotSource Slotter, doneChan chan struct{}, out io.Writer) *Marker {
 	return &Marker{
-		DoneChan:    doneChan,
-		ID:          ID,
-		MarkQueue:   make(chan int, BufferLen),
-		Period:      period,
-		SDK:         sdkContext,
-		Signal:      signal,
-		SignalQueue: make(chan uint64, BufferLen),
-		Out:         out,
+		DoneChan:   doneChan,
+		ID:         ID,
+		MarkQueue:  make(chan int, BufferLen),
+		Period:     period,
+		SDK:        sdkContext,
+		SlotSource: slotSource,
+		SlotQueue:  make(chan uint64, BufferLen),
+		Out:        out,
 	}
 }
 
@@ -58,7 +54,7 @@ func (m *Marker) Run() error {
 	msg := fmt.Sprintf("[%d] Marker exited", m.ID)
 	defer fmt.Fprintln(m.Out, msg)
 
-	if ok := m.Signal.Register(m.ID, m.SignalQueue); !ok {
+	if ok := m.SlotSource.Register(m.ID, m.SlotQueue); !ok {
 		return fmt.Errorf("[%d] Unable to register with signaler", m.ID)
 	}
 
@@ -80,18 +76,13 @@ func (m *Marker) Run() error {
 
 	for {
 		select {
-		case blockNumber := <-m.SignalQueue:
-			m.once.Do(func() {
-				m.first = int(blockNumber)
-			})
-
-			slot := int(blockNumber) - m.first
-			msg := fmt.Sprintf("[%d] Processing slot %d", m.ID, slot)
+		case slot := <-m.SlotQueue:
+			msg := fmt.Sprintf("[%d] Processing slot %d", m.ID, int(slot))
 			fmt.Fprintln(m.Out, msg)
 
-			if (slot+1)%m.Period == 0 { // We add 1 because slot 0 is the 1st slot
+			if (int(slot)+1)%m.Period == 0 { // We add 1 because slot 0 is the 1st slot
 				select {
-				case m.MarkQueue <- slot:
+				case m.MarkQueue <- int(slot):
 				default:
 					msg := fmt.Sprintf("[%d] Unable to push slot %d to 'mark' queue (size: %d)", m.ID, slot, len(m.MarkQueue))
 					fmt.Fprintln(m.Out, msg)
