@@ -31,46 +31,46 @@ type SDKer interface {
 	Invoke(slot int, action string, dataB []byte) ([]byte, error)
 }
 
-// Slotter ...
-//go:generate counterfeiter . Slotter
-type Slotter interface {
+// Notifier ...
+//go:generate counterfeiter . Notifier
+type Notifier interface {
 	Register(id int, queue chan int) bool
 }
 
 // Agent ...
 type Agent struct {
-	BuyQueue   chan int
-	DoneChan   chan struct{}
-	ID         int
-	SDK        SDKer
-	SellQueue  chan int
-	SlotQueue  chan int
-	SlotSource Slotter
-	Out        io.Writer
-	Trace      [][]float64
+	BuyQueue  chan int
+	DoneChan  chan struct{}
+	ID        int
+	SDK       SDKer
+	SellQueue chan int
+	SlotQueue chan int
+	Notifier  Notifier
+	Trace     [][]float64
+	Writer    io.Writer
 }
 
 // New ...
-func New(id int, trace [][]float64, sdkContext SDKer, slotSource Slotter, doneChan chan struct{}, out io.Writer) *Agent {
+func New(id int, trace [][]float64, sdkctx SDKer, notifier Notifier, donec chan struct{}, writer io.Writer) *Agent {
 	return &Agent{
-		BuyQueue:   make(chan int, BufferLen),
-		DoneChan:   doneChan,
-		ID:         id,
-		SellQueue:  make(chan int, BufferLen),
-		SDK:        sdkContext,
-		SlotQueue:  make(chan int, BufferLen),
-		SlotSource: slotSource,
-		Out:        out,
-		Trace:      trace,
+		BuyQueue:  make(chan int, BufferLen),
+		DoneChan:  donec,
+		ID:        id,
+		SellQueue: make(chan int, BufferLen),
+		SDK:       sdkctx,
+		SlotQueue: make(chan int, BufferLen),
+		Notifier:  notifier,
+		Trace:     trace,
+		Writer:    writer,
 	}
 }
 
 // Run ...
 func (a *Agent) Run() error {
 	msg := fmt.Sprintf("[%d] Agent exited", a.ID)
-	defer fmt.Fprintln(a.Out, msg)
+	defer fmt.Fprintln(a.Writer, msg)
 
-	if ok := a.SlotSource.Register(a.ID, a.SlotQueue); !ok {
+	if ok := a.Notifier.Register(a.ID, a.SlotQueue); !ok {
 		return fmt.Errorf("[%d] Unable to register with signaler", a.ID)
 	}
 
@@ -101,20 +101,20 @@ func (a *Agent) Run() error {
 		case slot := <-a.SlotQueue:
 			rowIdx := int(slot)
 			msg := fmt.Sprintf("[%d] Processing row %d: %v", a.ID, rowIdx, a.Trace[rowIdx])
-			fmt.Fprintln(a.Out, msg)
+			fmt.Fprintln(a.Writer, msg)
 
 			select {
 			case a.BuyQueue <- rowIdx:
 			default:
 				msg := fmt.Sprintf("[%d] Unable to push row %d to 'buy' queue (size: %d)", a.ID, rowIdx, len(a.BuyQueue))
-				fmt.Fprintln(a.Out, msg)
+				fmt.Fprintln(a.Writer, msg)
 			}
 
 			select {
 			case a.SellQueue <- rowIdx:
 			default:
 				msg := fmt.Sprintf("[%d] Unable to push row %d to 'sell' queue (size: %d)", a.ID, rowIdx, len(a.BuyQueue))
-				fmt.Fprintln(a.Out, msg)
+				fmt.Fprintln(a.Writer, msg)
 			}
 		case <-a.DoneChan:
 			return nil
@@ -129,10 +129,10 @@ func (a *Agent) Buy(rowIdx int) {
 		ppu := row[Lo] + (row[Hi]-row[Lo])*(1.0-rand.Float64())
 		bid, _ := json.Marshal([]float64{ppu, row[Use] * ToKWh}) // first arg: PPU, second arg: QTY
 		msg := fmt.Sprintf("[%d] Invoking 'buy' for %.3f kWh (%.3f) at %.3f ç/kWh", a.ID, row[Use]*ToKWh, row[Use], ppu)
-		fmt.Fprintln(a.Out, msg)
+		fmt.Fprintln(a.Writer, msg)
 		if _, err := a.SDK.Invoke(rowIdx, "buy", bid); err != nil {
 			msg := fmt.Sprintf("[%d] Unable to invoke 'buy' for row %d: %s\n", a.ID, rowIdx, err)
-			fmt.Fprintln(a.Out, msg)
+			fmt.Fprintln(a.Writer, msg)
 		}
 
 	}
@@ -145,10 +145,10 @@ func (a *Agent) Sell(rowIdx int) {
 		ppu := row[Lo] + (row[Hi]-row[Lo])*(1.0-rand.Float64())
 		bid, _ := json.Marshal([]float64{ppu, row[Gen] * ToKWh}) // first arg: PPU, second arg: QTY
 		msg := fmt.Sprintf("[%d] Invoking 'sell' for %.3f kWh (%.3f) at %.3f ç/kWh", a.ID, row[Gen]*ToKWh, row[Gen], ppu)
-		fmt.Fprintln(a.Out, msg)
+		fmt.Fprintln(a.Writer, msg)
 		if _, err := a.SDK.Invoke(rowIdx, "sell", bid); err != nil {
 			msg := fmt.Sprintf("[%d] Unable to invoke 'sell' for row %d: %s", a.ID, rowIdx, err)
-			fmt.Fprintln(a.Out, msg)
+			fmt.Fprintln(a.Writer, msg)
 		}
 	}
 }

@@ -22,14 +22,14 @@ func TestAgent(t *testing.T) {
 	require.NoError(t, err)
 	t.Log(m[csv.IDs[0]][0])
 
-	t.Run("slotter registration fails", func(t *testing.T) {
-		sdk := new(agentfakes.FakeSDKer)
-		slotsrc := new(agentfakes.FakeSlotter)
+	t.Run("notifier registration fails", func(t *testing.T) {
+		sdkctx := new(agentfakes.FakeSDKer)
+		slotnotifier := new(agentfakes.FakeNotifier)
 		bfr := gbytes.NewBuffer()
 
-		a := agent.New(csv.IDs[0], m[csv.IDs[0]], sdk, slotsrc, make(chan struct{}), bfr)
+		a := agent.New(csv.IDs[0], m[csv.IDs[0]], sdkctx, slotnotifier, make(chan struct{}), bfr)
 
-		slotsrc.RegisterReturns(false)
+		slotnotifier.RegisterReturns(false)
 
 		var err error
 		go func() {
@@ -41,14 +41,14 @@ func TestAgent(t *testing.T) {
 	})
 
 	t.Run("done chan closes", func(t *testing.T) {
-		sdk := new(agentfakes.FakeSDKer)
-		slotsrc := new(agentfakes.FakeSlotter)
+		sdkctx := new(agentfakes.FakeSDKer)
+		slotnotifier := new(agentfakes.FakeNotifier)
 		donec := make(chan struct{})
 		bfr := gbytes.NewBuffer()
 
-		a := agent.New(csv.IDs[0], m[csv.IDs[0]], sdk, slotsrc, donec, bfr)
+		a := agent.New(csv.IDs[0], m[csv.IDs[0]], sdkctx, slotnotifier, donec, bfr)
 
-		slotsrc.RegisterReturns(true)
+		slotnotifier.RegisterReturns(true)
 
 		var err error
 		go func() {
@@ -61,16 +61,16 @@ func TestAgent(t *testing.T) {
 		g.Expect(err).ToNot(HaveOccurred())
 	})
 
-	t.Run("slotter works fine", func(t *testing.T) {
-		sdk := new(agentfakes.FakeSDKer)
-		slotsrc := new(agentfakes.FakeSlotter)
+	t.Run("notifier works fine", func(t *testing.T) {
+		sdkctx := new(agentfakes.FakeSDKer)
+		slotnotifier := new(agentfakes.FakeNotifier)
 		donec := make(chan struct{})
 		bfr := gbytes.NewBuffer()
 
-		a := agent.New(csv.IDs[0], m[csv.IDs[0]], sdk, slotsrc, donec, bfr)
+		a := agent.New(csv.IDs[0], m[csv.IDs[0]], sdkctx, slotnotifier, donec, bfr)
 
-		slotsrc.RegisterReturns(true)
-		sdk.InvokeReturns(nil, nil)
+		slotnotifier.RegisterReturns(true)
+		sdkctx.InvokeReturns(nil, nil)
 
 		go func() {
 			a.Run()
@@ -81,7 +81,7 @@ func TestAgent(t *testing.T) {
 		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Processing row 0:"))
 		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Invoking 'buy' for"))
 
-		sdk.InvokeReturns(nil, errors.New("foo"))
+		sdkctx.InvokeReturns(nil, errors.New("foo"))
 		a.SlotQueue <- 1
 		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Unable to invoke 'buy' for"))
 

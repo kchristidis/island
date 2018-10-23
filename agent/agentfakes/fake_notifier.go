@@ -7,7 +7,7 @@ import (
 	agent "github.com/kchristidis/exp2/agent"
 )
 
-type FakeSlotter struct {
+type FakeNotifier struct {
 	RegisterStub        func(int, chan int) bool
 	registerMutex       sync.RWMutex
 	registerArgsForCall []struct {
@@ -24,7 +24,7 @@ type FakeSlotter struct {
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakeSlotter) Register(arg1 int, arg2 chan int) bool {
+func (fake *FakeNotifier) Register(arg1 int, arg2 chan int) bool {
 	fake.registerMutex.Lock()
 	ret, specificReturn := fake.registerReturnsOnCall[len(fake.registerArgsForCall)]
 	fake.registerArgsForCall = append(fake.registerArgsForCall, struct {
@@ -43,26 +43,26 @@ func (fake *FakeSlotter) Register(arg1 int, arg2 chan int) bool {
 	return fakeReturns.result1
 }
 
-func (fake *FakeSlotter) RegisterCallCount() int {
+func (fake *FakeNotifier) RegisterCallCount() int {
 	fake.registerMutex.RLock()
 	defer fake.registerMutex.RUnlock()
 	return len(fake.registerArgsForCall)
 }
 
-func (fake *FakeSlotter) RegisterCalls(stub func(int, chan int) bool) {
+func (fake *FakeNotifier) RegisterCalls(stub func(int, chan int) bool) {
 	fake.registerMutex.Lock()
 	defer fake.registerMutex.Unlock()
 	fake.RegisterStub = stub
 }
 
-func (fake *FakeSlotter) RegisterArgsForCall(i int) (int, chan int) {
+func (fake *FakeNotifier) RegisterArgsForCall(i int) (int, chan int) {
 	fake.registerMutex.RLock()
 	defer fake.registerMutex.RUnlock()
 	argsForCall := fake.registerArgsForCall[i]
 	return argsForCall.arg1, argsForCall.arg2
 }
 
-func (fake *FakeSlotter) RegisterReturns(result1 bool) {
+func (fake *FakeNotifier) RegisterReturns(result1 bool) {
 	fake.registerMutex.Lock()
 	defer fake.registerMutex.Unlock()
 	fake.RegisterStub = nil
@@ -71,7 +71,7 @@ func (fake *FakeSlotter) RegisterReturns(result1 bool) {
 	}{result1}
 }
 
-func (fake *FakeSlotter) RegisterReturnsOnCall(i int, result1 bool) {
+func (fake *FakeNotifier) RegisterReturnsOnCall(i int, result1 bool) {
 	fake.registerMutex.Lock()
 	defer fake.registerMutex.Unlock()
 	fake.RegisterStub = nil
@@ -85,7 +85,7 @@ func (fake *FakeSlotter) RegisterReturnsOnCall(i int, result1 bool) {
 	}{result1}
 }
 
-func (fake *FakeSlotter) Invocations() map[string][][]interface{} {
+func (fake *FakeNotifier) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
 	fake.registerMutex.RLock()
@@ -97,7 +97,7 @@ func (fake *FakeSlotter) Invocations() map[string][][]interface{} {
 	return copiedInvocations
 }
 
-func (fake *FakeSlotter) recordInvocation(key string, args []interface{}) {
+func (fake *FakeNotifier) recordInvocation(key string, args []interface{}) {
 	fake.invocationsMutex.Lock()
 	defer fake.invocationsMutex.Unlock()
 	if fake.invocations == nil {
@@ -109,4 +109,4 @@ func (fake *FakeSlotter) recordInvocation(key string, args []interface{}) {
 	fake.invocations[key] = append(fake.invocations[key], args)
 }
 
-var _ agent.Slotter = new(FakeSlotter)
+var _ agent.Notifier = new(FakeNotifier)
