@@ -2,6 +2,7 @@ package agent
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -71,7 +72,9 @@ func (a *Agent) Run() error {
 	defer fmt.Fprintln(a.Writer, msg)
 
 	if ok := a.Notifier.Register(a.ID, a.SlotQueue); !ok {
-		return fmt.Errorf("[%d] Unable to register with signaler", a.ID)
+		msg := fmt.Sprintf("[%d] Unable to register with signaler", a.ID)
+		fmt.Fprintln(a.Writer, msg)
+		return errors.New(msg)
 	}
 
 	go func() {
@@ -108,6 +111,7 @@ func (a *Agent) Run() error {
 			default:
 				msg := fmt.Sprintf("[%d] Unable to push row %d to 'buy' queue (size: %d)", a.ID, rowIdx, len(a.BuyQueue))
 				fmt.Fprintln(a.Writer, msg)
+				return errors.New(msg)
 			}
 
 			select {
@@ -115,6 +119,7 @@ func (a *Agent) Run() error {
 			default:
 				msg := fmt.Sprintf("[%d] Unable to push row %d to 'sell' queue (size: %d)", a.ID, rowIdx, len(a.BuyQueue))
 				fmt.Fprintln(a.Writer, msg)
+				return errors.New(msg)
 			}
 		case <-a.DoneChan:
 			return nil
@@ -123,7 +128,7 @@ func (a *Agent) Run() error {
 }
 
 // Buy ...
-func (a *Agent) Buy(rowIdx int) {
+func (a *Agent) Buy(rowIdx int) error {
 	row := a.Trace[rowIdx]
 	if row[Use] > 0 {
 		ppu := row[Lo] + (row[Hi]-row[Lo])*(1.0-rand.Float64())
@@ -133,13 +138,14 @@ func (a *Agent) Buy(rowIdx int) {
 		if _, err := a.SDK.Invoke(rowIdx, "buy", bid); err != nil {
 			msg := fmt.Sprintf("[%d] Unable to invoke 'buy' for row %d: %s\n", a.ID, rowIdx, err)
 			fmt.Fprintln(a.Writer, msg)
+			return errors.New(msg)
 		}
-
 	}
+	return nil
 }
 
 // Sell ...
-func (a *Agent) Sell(rowIdx int) {
+func (a *Agent) Sell(rowIdx int) error {
 	row := a.Trace[rowIdx]
 	if row[Gen] > 0 {
 		ppu := row[Lo] + (row[Hi]-row[Lo])*(1.0-rand.Float64())
@@ -149,6 +155,8 @@ func (a *Agent) Sell(rowIdx int) {
 		if _, err := a.SDK.Invoke(rowIdx, "sell", bid); err != nil {
 			msg := fmt.Sprintf("[%d] Unable to invoke 'sell' for row %d: %s", a.ID, rowIdx, err)
 			fmt.Fprintln(a.Writer, msg)
+			return errors.New(msg)
 		}
 	}
+	return nil
 }

@@ -25,19 +25,26 @@ func TestAgent(t *testing.T) {
 	t.Run("notifier registration fails", func(t *testing.T) {
 		sdkctx := new(agentfakes.FakeSDKer)
 		slotnotifier := new(agentfakes.FakeNotifier)
+		donec := make(chan struct{})
 		bfr := gbytes.NewBuffer()
 
-		a := agent.New(csv.IDs[0], m[csv.IDs[0]], sdkctx, slotnotifier, make(chan struct{}), bfr)
+		a := agent.New(csv.IDs[0], m[csv.IDs[0]], sdkctx, slotnotifier, donec, bfr)
 
 		slotnotifier.RegisterReturns(false)
 
 		var err error
+		deadc := make(chan struct{})
 		go func() {
 			err = a.Run()
+			close(deadc)
 		}()
 
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Unable to register with signaler"))
 		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Agent exited"))
-		g.Eventually(err, "1s", "50ms").Should(HaveOccurred())
+
+		close(donec)
+		<-deadc
+		g.Expect(err).To(HaveOccurred())
 	})
 
 	t.Run("done chan closes", func(t *testing.T) {
@@ -51,11 +58,14 @@ func TestAgent(t *testing.T) {
 		slotnotifier.RegisterReturns(true)
 
 		var err error
+		deadc := make(chan struct{})
 		go func() {
 			err = a.Run()
+			close(deadc)
 		}()
 
 		close(donec)
+		<-deadc
 
 		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Agent exited"))
 		g.Expect(err).ToNot(HaveOccurred())
@@ -72,8 +82,11 @@ func TestAgent(t *testing.T) {
 		slotnotifier.RegisterReturns(true)
 		sdkctx.InvokeReturns(nil, nil)
 
+		var err error
+		deadc := make(chan struct{})
 		go func() {
-			a.Run()
+			err = a.Run()
+			close(deadc)
 		}()
 
 		a.SlotQueue <- 0
@@ -90,5 +103,8 @@ func TestAgent(t *testing.T) {
 		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Unable to push row 2 to 'buy' queue"))
 
 		close(donec)
+		<-deadc
+
+		g.Expect(err).To(HaveOccurred())
 	})
 }
