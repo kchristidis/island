@@ -39,8 +39,8 @@ func TestAgent(t *testing.T) {
 			close(deadc)
 		}()
 
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Unable to register with signaler"))
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Agent exited"))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("unable to register with signaler"))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("exited"))
 
 		close(donec)
 		<-deadc
@@ -67,7 +67,7 @@ func TestAgent(t *testing.T) {
 		close(donec)
 		<-deadc
 
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Agent exited"))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("exited"))
 		g.Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -91,16 +91,16 @@ func TestAgent(t *testing.T) {
 
 		a.SlotQueue <- 0
 
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Processing row 0:"))
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Invoking 'buy' for"))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("processing row 0:"))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("invoking 'buy' for"))
 
 		sdkctx.InvokeReturns(nil, errors.New("foo"))
 		a.SlotQueue <- 1
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Unable to invoke 'buy' for"))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("unable to invoke 'buy' for"))
 
 		a.BuyQueue = nil
 		a.SlotQueue <- 2
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Unable to push row 2 to 'buy' queue"))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("unable to push row 2 to 'buy' queue"))
 
 		close(donec)
 		<-deadc
