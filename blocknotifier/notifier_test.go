@@ -1,4 +1,4 @@
-package block_test
+package blocknotifier_test
 
 import (
 	"errors"
@@ -7,8 +7,8 @@ import (
 
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 	"github.com/hyperledger/fabric-sdk-go/third_party/github.com/hyperledger/fabric/protos/common"
-	"github.com/kchristidis/exp2/block"
-	"github.com/kchristidis/exp2/block/blockfakes"
+	"github.com/kchristidis/exp2/blocknotifier"
+	"github.com/kchristidis/exp2/blocknotifier/blocknotifierfakes"
 	"github.com/onsi/gomega/gbytes"
 
 	. "github.com/onsi/gomega"
@@ -17,20 +17,25 @@ import (
 func TestNotifier(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	querier := new(blockfakes.FakeLedgerQuerier)
-	outc := make(chan int)
 	bfr := gbytes.NewBuffer()
+	invoker := new(blocknotifierfakes.FakeInvoker)
+	querier := new(blocknotifierfakes.FakeQuerier)
 	resp := new(fab.BlockchainInfoResponse)
+
+	outc := make(chan int)
+	invoker.InvokeReturns(nil, nil)
 	resp.BCI = new(common.BlockchainInfo)
 
 	t.Run("early block received", func(t *testing.T) {
 		donec := make(chan struct{})
 
-		n := &block.Notifier{
+		n := &blocknotifier.Notifier{
+			BlocksPerSlot:  1,
+			ClockPeriod:    500 * time.Millisecond,
 			DoneChan:       donec,
-			LedgerSource:   querier,
-			Period:         1,
+			Invoker:        invoker,
 			OutChan:        outc,
+			Querier:        querier,
 			SleepDuration:  10 * time.Millisecond,
 			StartFromBlock: 10,
 			Writer:         bfr,
@@ -65,11 +70,13 @@ func TestNotifier(t *testing.T) {
 	t.Run("start block received", func(t *testing.T) {
 		donec := make(chan struct{})
 
-		n := &block.Notifier{
+		n := &blocknotifier.Notifier{
+			BlocksPerSlot:  1,
+			ClockPeriod:    500 * time.Millisecond,
 			DoneChan:       donec,
-			LedgerSource:   querier,
-			Period:         1,
+			Invoker:        invoker,
 			OutChan:        outc,
+			Querier:        querier,
 			SleepDuration:  10 * time.Millisecond,
 			StartFromBlock: 10,
 			Writer:         bfr,
@@ -106,11 +113,13 @@ func TestNotifier(t *testing.T) {
 	t.Run("first block received is larger than start", func(t *testing.T) {
 		donec := make(chan struct{})
 
-		n := &block.Notifier{
+		n := &blocknotifier.Notifier{
+			BlocksPerSlot:  1,
+			ClockPeriod:    500 * time.Millisecond,
 			DoneChan:       donec,
-			LedgerSource:   querier,
-			Period:         1,
+			Invoker:        invoker,
 			OutChan:        outc,
+			Querier:        querier,
 			SleepDuration:  10 * time.Millisecond,
 			StartFromBlock: 10,
 			Writer:         bfr,
@@ -144,11 +153,13 @@ func TestNotifier(t *testing.T) {
 	t.Run("query fails", func(t *testing.T) {
 		donec := make(chan struct{})
 
-		n := &block.Notifier{
+		n := &blocknotifier.Notifier{
+			BlocksPerSlot:  1,
+			ClockPeriod:    500 * time.Millisecond,
 			DoneChan:       donec,
-			LedgerSource:   querier,
-			Period:         1,
+			Invoker:        invoker,
 			OutChan:        outc,
+			Querier:        querier,
 			SleepDuration:  10 * time.Millisecond,
 			StartFromBlock: 10,
 			Writer:         bfr,
@@ -173,11 +184,13 @@ func TestNotifier(t *testing.T) {
 	t.Run("non-period block received", func(t *testing.T) {
 		donec := make(chan struct{})
 
-		n := &block.Notifier{
+		n := &blocknotifier.Notifier{
+			BlocksPerSlot:  3,
+			ClockPeriod:    500 * time.Millisecond,
 			DoneChan:       donec,
-			LedgerSource:   querier,
-			Period:         3,
+			Invoker:        invoker,
 			OutChan:        outc,
+			Querier:        querier,
 			SleepDuration:  10 * time.Millisecond,
 			StartFromBlock: 10,
 			Writer:         bfr,
@@ -214,11 +227,13 @@ func TestNotifier(t *testing.T) {
 	t.Run("period block received", func(t *testing.T) {
 		donec := make(chan struct{})
 
-		n := &block.Notifier{
+		n := &blocknotifier.Notifier{
+			BlocksPerSlot:  3,
+			ClockPeriod:    500 * time.Millisecond,
 			DoneChan:       donec,
-			LedgerSource:   querier,
-			Period:         3,
+			Invoker:        invoker,
 			OutChan:        outc,
+			Querier:        querier,
 			SleepDuration:  10 * time.Millisecond,
 			StartFromBlock: 10,
 			Writer:         bfr,
@@ -226,7 +241,7 @@ func TestNotifier(t *testing.T) {
 
 		n.LastHeight = n.StartFromBlock
 
-		resp.BCI.Height = n.StartFromBlock + uint64(n.Period)
+		resp.BCI.Height = n.StartFromBlock + uint64(n.BlocksPerSlot)
 		querier.QueryInfoReturns(resp, nil)
 
 		var err error
