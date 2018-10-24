@@ -121,6 +121,11 @@ func (a *Agent) Run() error {
 				fmt.Fprintln(a.Writer, msg)
 				return errors.New(msg)
 			}
+
+			// Return when you're done processing your trace
+			if rowIdx == len(a.Trace) {
+				return nil
+			}
 		case <-a.DoneChan:
 			return nil
 		}
