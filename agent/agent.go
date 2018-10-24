@@ -26,9 +26,9 @@ const (
 	Hi
 )
 
-// SDKer ...
-//go:generate counterfeiter . SDKer
-type SDKer interface {
+// Invoker ...
+//go:generate counterfeiter . Invoker
+type Invoker interface {
 	Invoke(slot int, action string, dataB []byte) ([]byte, error)
 }
 
@@ -43,7 +43,7 @@ type Agent struct {
 	BuyQueue  chan int
 	DoneChan  chan struct{}
 	ID        int
-	SDK       SDKer
+	Invoker   Invoker
 	SellQueue chan int
 	SlotQueue chan int // this is the agent's trigger, i.e. it's support to act whenever a new slot is created
 	Notifier  Notifier
@@ -52,13 +52,13 @@ type Agent struct {
 }
 
 // New ...
-func New(id int, trace [][]float64, sdkctx SDKer, notifier Notifier, donec chan struct{}, writer io.Writer) *Agent {
+func New(id int, trace [][]float64, invoker Invoker, notifier Notifier, donec chan struct{}, writer io.Writer) *Agent {
 	return &Agent{
 		BuyQueue:  make(chan int, BufferLen),
 		DoneChan:  donec,
 		ID:        id,
+		Invoker:   invoker,
 		SellQueue: make(chan int, BufferLen),
-		SDK:       sdkctx,
 		SlotQueue: make(chan int, BufferLen),
 		Notifier:  notifier,
 		Trace:     trace,
@@ -143,7 +143,7 @@ func (a *Agent) Buy(rowIdx int) error {
 		bid, _ := json.Marshal([]float64{ppu, row[Use] * ToKWh}) // first arg: PPU, second arg: QTY
 		msg := fmt.Sprintf("Agent %d invoking 'buy' for %.3f kWh (%.3f) at %.3f ç/kWh", a.ID, row[Use]*ToKWh, row[Use], ppu)
 		fmt.Fprintln(a.Writer, msg)
-		if _, err := a.SDK.Invoke(rowIdx, "buy", bid); err != nil {
+		if _, err := a.Invoker.Invoke(rowIdx, "buy", bid); err != nil {
 			msg := fmt.Sprintf("Agent %d unable to invoke 'buy' for row %d: %s\n", a.ID, rowIdx, err)
 			fmt.Fprintln(a.Writer, msg)
 			return errors.New(msg)
@@ -160,7 +160,7 @@ func (a *Agent) Sell(rowIdx int) error {
 		bid, _ := json.Marshal([]float64{ppu, row[Gen] * ToKWh}) // first arg: PPU, second arg: QTY
 		msg := fmt.Sprintf("Agent %d invoking 'sell' for %.3f kWh (%.3f) at %.3f ç/kWh", a.ID, row[Gen]*ToKWh, row[Gen], ppu)
 		fmt.Fprintln(a.Writer, msg)
-		if _, err := a.SDK.Invoke(rowIdx, "sell", bid); err != nil {
+		if _, err := a.Invoker.Invoke(rowIdx, "sell", bid); err != nil {
 			msg := fmt.Sprintf("Agent %d unable to invoke 'sell' for row %d: %s", a.ID, rowIdx, err)
 			fmt.Fprintln(a.Writer, msg)
 			return errors.New(msg)

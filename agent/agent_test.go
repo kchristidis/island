@@ -23,12 +23,12 @@ func TestAgent(t *testing.T) {
 	t.Log(m[csv.IDs[0]][0])
 
 	t.Run("notifier registration fails", func(t *testing.T) {
-		sdkctx := new(agentfakes.FakeSDKer)
+		invoker := new(agentfakes.FakeInvoker)
 		slotnotifier := new(agentfakes.FakeNotifier)
 		donec := make(chan struct{})
 		bfr := gbytes.NewBuffer()
 
-		a := agent.New(csv.IDs[0], m[csv.IDs[0]], sdkctx, slotnotifier, donec, bfr)
+		a := agent.New(csv.IDs[0], m[csv.IDs[0]], invoker, slotnotifier, donec, bfr)
 
 		slotnotifier.RegisterReturns(false)
 
@@ -48,12 +48,12 @@ func TestAgent(t *testing.T) {
 	})
 
 	t.Run("done chan closes", func(t *testing.T) {
-		sdkctx := new(agentfakes.FakeSDKer)
+		invoker := new(agentfakes.FakeInvoker)
 		slotnotifier := new(agentfakes.FakeNotifier)
 		donec := make(chan struct{})
 		bfr := gbytes.NewBuffer()
 
-		a := agent.New(csv.IDs[0], m[csv.IDs[0]], sdkctx, slotnotifier, donec, bfr)
+		a := agent.New(csv.IDs[0], m[csv.IDs[0]], invoker, slotnotifier, donec, bfr)
 
 		slotnotifier.RegisterReturns(true)
 
@@ -72,15 +72,15 @@ func TestAgent(t *testing.T) {
 	})
 
 	t.Run("notifier works fine", func(t *testing.T) {
-		sdkctx := new(agentfakes.FakeSDKer)
+		invoker := new(agentfakes.FakeInvoker)
 		slotnotifier := new(agentfakes.FakeNotifier)
 		donec := make(chan struct{})
 		bfr := gbytes.NewBuffer()
 
-		a := agent.New(csv.IDs[0], m[csv.IDs[0]], sdkctx, slotnotifier, donec, bfr)
+		a := agent.New(csv.IDs[0], m[csv.IDs[0]], invoker, slotnotifier, donec, bfr)
 
 		slotnotifier.RegisterReturns(true)
-		sdkctx.InvokeReturns(nil, nil)
+		invoker.InvokeReturns(nil, nil)
 
 		var err error
 		deadc := make(chan struct{})
@@ -94,7 +94,7 @@ func TestAgent(t *testing.T) {
 		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("processing row 0:"))
 		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("invoking 'buy' for"))
 
-		sdkctx.InvokeReturns(nil, errors.New("foo"))
+		invoker.InvokeReturns(nil, errors.New("foo"))
 		a.SlotQueue <- 1
 		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("unable to invoke 'buy' for"))
 
