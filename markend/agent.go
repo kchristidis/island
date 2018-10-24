@@ -1,19 +1,17 @@
 package markend
 
 import (
+	"errors"
 	"fmt"
 	"io"
 )
 
-// ID ...
-const ID = -1
-
 // BufferLen ...
 const BufferLen = 100
 
-// SDKer ...
-//go:generate counterfeiter . SDKer
-type SDKer interface {
+// Invoker ...
+//go:generate counterfeiter . Invoker
+type Invoker interface {
 	Invoke(slot int, action string, dataB []byte) ([]byte, error)
 }
 
@@ -26,24 +24,23 @@ type Notifier interface {
 // Agent ...
 type Agent struct {
 	DoneChan  chan struct{}
+	ErrChan   chan error
 	ID        int
+	Invoker   Invoker
 	MarkQueue chan int
-	Period    int
-	SDK       SDKer
 	Notifier  Notifier
-	SlotQueue chan int
+	SlotQueue chan int // this is the agent's trigger, i.e. it's supposed to act whenever a new slot is created
 	Writer    io.Writer
 }
 
 // New ...
-func New(period int, sdkctx SDKer, notifier Notifier, donec chan struct{}, writer io.Writer) *Agent {
+func New(invoker Invoker, notifier Notifier, donec chan struct{}, writer io.Writer) *Agent {
 	return &Agent{
 		DoneChan:  donec,
-		ID:        ID,
+		ErrChan:   make(chan error),
+		Invoker:   invoker,
 		MarkQueue: make(chan int, BufferLen),
 		Notifier:  notifier,
-		Period:    period,
-		SDK:       sdkctx,
 		SlotQueue: make(chan int, BufferLen),
 		Writer:    writer,
 	}
@@ -51,22 +48,27 @@ func New(period int, sdkctx SDKer, notifier Notifier, donec chan struct{}, write
 
 // Run ...
 func (a *Agent) Run() error {
-	msg := fmt.Sprintf("[%d] Markend agent exited", a.ID)
+	msg := fmt.Sprint("Markend agent exited")
 	defer fmt.Fprintln(a.Writer, msg)
 
 	if ok := a.Notifier.Register(a.ID, a.SlotQueue); !ok {
-		return fmt.Errorf("[%d] Unable to register with signaler", a.ID)
+		msg := fmt.Sprint("Markend agent unable to register with signaler")
+		fmt.Fprintln(a.Writer, msg)
+		return errors.New(msg)
 	}
+
+	msg = fmt.Sprintf("Markend agent %d registered with signaler", a.ID)
+	fmt.Fprintln(a.Writer, msg)
 
 	go func() {
 		for {
 			select {
 			case slot := <-a.MarkQueue:
-				msg := fmt.Sprintf("[%d] Invoking 'markEnd' for slot %d", a.ID, slot)
+				msg := fmt.Sprintf("Markend agent invoking 'markEnd' for slot %d", slot)
 				fmt.Fprintln(a.Writer, msg)
-				if _, err := a.SDK.Invoke(2, "markEnd", []byte("prvKey")); err != nil {
-					msg := fmt.Sprintf("[%d] Unable to invoke 'markEnd' for slot %d: %s\n", a.ID, slot, err)
-					fmt.Fprintf(a.Writer, msg)
+				if _, err := a.Invoker.Invoke(2, "markEnd", []byte("prvKey")); err != nil {
+					msg := fmt.Sprintf("Markend agent unable to invoke 'markEnd' for slot %d: %s\n", slot, err)
+					a.ErrChan <- errors.New(msg)
 				}
 			case <-a.DoneChan:
 				return
@@ -76,20 +78,26 @@ func (a *Agent) Run() error {
 
 	for {
 		select {
+		case err := <-a.ErrChan:
+			fmt.Fprintln(a.Writer, err.Error())
+			return err
 		case slot := <-a.SlotQueue:
-			msg := fmt.Sprintf("[%d] Processing slot %d", a.ID, slot)
+			msg := fmt.Sprintf("Markend agent processing slot %d", slot)
 			fmt.Fprintln(a.Writer, msg)
-
-			if (slot+1)%a.Period == 0 { // We add 1 because slot 0 is the 1st slot
-				select {
-				case a.MarkQueue <- slot:
-				default:
-					msg := fmt.Sprintf("[%d] Unable to push slot %d to 'mark' queue (size: %d)", a.ID, slot, len(a.MarkQueue))
-					fmt.Fprintln(a.Writer, msg)
-				}
+			select {
+			case a.MarkQueue <- slot:
+			default:
+				msg := fmt.Sprintf("Markend agent unable to push slot %d to 'mark' queue (size: %d)", slot, len(a.MarkQueue))
+				fmt.Fprintln(a.Writer, msg)
+				return errors.New(msg)
 			}
 		case <-a.DoneChan:
-			return nil
+			select { // cover the edge case in tests where you close the donechan to conclude the test, and this branch is selected over the top-level errchan one
+			case err := <-a.ErrChan:
+				return err
+			default:
+				return nil
+			}
 		}
 	}
 }

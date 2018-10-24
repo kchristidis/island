@@ -7,7 +7,7 @@ import (
 	markend "github.com/kchristidis/exp2/markend"
 )
 
-type FakeSDKer struct {
+type FakeInvoker struct {
 	InvokeStub        func(int, string, []byte) ([]byte, error)
 	invokeMutex       sync.RWMutex
 	invokeArgsForCall []struct {
@@ -27,7 +27,7 @@ type FakeSDKer struct {
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakeSDKer) Invoke(arg1 int, arg2 string, arg3 []byte) ([]byte, error) {
+func (fake *FakeInvoker) Invoke(arg1 int, arg2 string, arg3 []byte) ([]byte, error) {
 	var arg3Copy []byte
 	if arg3 != nil {
 		arg3Copy = make([]byte, len(arg3))
@@ -52,26 +52,26 @@ func (fake *FakeSDKer) Invoke(arg1 int, arg2 string, arg3 []byte) ([]byte, error
 	return fakeReturns.result1, fakeReturns.result2
 }
 
-func (fake *FakeSDKer) InvokeCallCount() int {
+func (fake *FakeInvoker) InvokeCallCount() int {
 	fake.invokeMutex.RLock()
 	defer fake.invokeMutex.RUnlock()
 	return len(fake.invokeArgsForCall)
 }
 
-func (fake *FakeSDKer) InvokeCalls(stub func(int, string, []byte) ([]byte, error)) {
+func (fake *FakeInvoker) InvokeCalls(stub func(int, string, []byte) ([]byte, error)) {
 	fake.invokeMutex.Lock()
 	defer fake.invokeMutex.Unlock()
 	fake.InvokeStub = stub
 }
 
-func (fake *FakeSDKer) InvokeArgsForCall(i int) (int, string, []byte) {
+func (fake *FakeInvoker) InvokeArgsForCall(i int) (int, string, []byte) {
 	fake.invokeMutex.RLock()
 	defer fake.invokeMutex.RUnlock()
 	argsForCall := fake.invokeArgsForCall[i]
 	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
 }
 
-func (fake *FakeSDKer) InvokeReturns(result1 []byte, result2 error) {
+func (fake *FakeInvoker) InvokeReturns(result1 []byte, result2 error) {
 	fake.invokeMutex.Lock()
 	defer fake.invokeMutex.Unlock()
 	fake.InvokeStub = nil
@@ -81,7 +81,7 @@ func (fake *FakeSDKer) InvokeReturns(result1 []byte, result2 error) {
 	}{result1, result2}
 }
 
-func (fake *FakeSDKer) InvokeReturnsOnCall(i int, result1 []byte, result2 error) {
+func (fake *FakeInvoker) InvokeReturnsOnCall(i int, result1 []byte, result2 error) {
 	fake.invokeMutex.Lock()
 	defer fake.invokeMutex.Unlock()
 	fake.InvokeStub = nil
@@ -97,7 +97,7 @@ func (fake *FakeSDKer) InvokeReturnsOnCall(i int, result1 []byte, result2 error)
 	}{result1, result2}
 }
 
-func (fake *FakeSDKer) Invocations() map[string][][]interface{} {
+func (fake *FakeInvoker) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
 	fake.invokeMutex.RLock()
@@ -109,7 +109,7 @@ func (fake *FakeSDKer) Invocations() map[string][][]interface{} {
 	return copiedInvocations
 }
 
-func (fake *FakeSDKer) recordInvocation(key string, args []interface{}) {
+func (fake *FakeInvoker) recordInvocation(key string, args []interface{}) {
 	fake.invocationsMutex.Lock()
 	defer fake.invocationsMutex.Unlock()
 	if fake.invocations == nil {
@@ -121,4 +121,4 @@ func (fake *FakeSDKer) recordInvocation(key string, args []interface{}) {
 	fake.invocations[key] = append(fake.invocations[key], args)
 }
 
-var _ markend.SDKer = new(FakeSDKer)
+var _ markend.Invoker = new(FakeInvoker)
