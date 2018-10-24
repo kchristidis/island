@@ -20,7 +20,6 @@ func TestAgent(t *testing.T) {
 	path := filepath.Join("..", "csv", csv.Filename)
 	m, err := csv.Load(path)
 	require.NoError(t, err)
-	t.Log(m[csv.IDs[0]][0])
 
 	t.Run("notifier registration fails", func(t *testing.T) {
 		invoker := new(agentfakes.FakeInvoker)
@@ -80,7 +79,6 @@ func TestAgent(t *testing.T) {
 		a := agent.New(csv.IDs[0], m[csv.IDs[0]], invoker, slotnotifier, donec, bfr)
 
 		slotnotifier.RegisterReturns(true)
-		invoker.InvokeReturns(nil, nil)
 
 		var err error
 		deadc := make(chan struct{})
@@ -89,6 +87,7 @@ func TestAgent(t *testing.T) {
 			close(deadc)
 		}()
 
+		invoker.InvokeReturns(nil, nil)
 		a.SlotQueue <- 0
 
 		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("processing row 0:"))
