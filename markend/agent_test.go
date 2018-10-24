@@ -11,7 +11,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestMarkend(t *testing.T) {
+func TestAgent(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	t.Run("notifier registration fails", func(t *testing.T) {
