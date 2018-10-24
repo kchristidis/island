@@ -45,7 +45,7 @@ type Agent struct {
 	ID        int
 	Invoker   Invoker
 	SellQueue chan int
-	SlotQueue chan int // this is the agent's trigger, i.e. it's support to act whenever a new slot is created
+	SlotQueue chan int // this is the agent's trigger, i.e. it's supposed to act whenever a new slot is created
 	Notifier  Notifier
 	Trace     [][]float64
 	Writer    io.Writer
