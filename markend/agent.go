@@ -51,12 +51,12 @@ func (a *Agent) Run() error {
 	defer fmt.Fprintln(a.Writer, msg)
 
 	if ok := a.Notifier.Register(-1, a.SlotQueue); !ok {
-		msg := fmt.Sprint("[markend agent] Unable to register with signaler")
+		msg := fmt.Sprint("[markend agent] Unable to register with slot notifier")
 		fmt.Fprintln(a.Writer, msg)
 		return errors.New(msg)
 	}
 
-	msg = fmt.Sprintf("[markend agent] Registered with signaler")
+	msg = fmt.Sprintf("[markend agent] Registered with slot notifier")
 	fmt.Fprintln(a.Writer, msg)
 
 	go func() {
@@ -65,7 +65,7 @@ func (a *Agent) Run() error {
 			case slot := <-a.MarkQueue:
 				msg := fmt.Sprintf("[markend agent] Invoking 'markEnd' for slot %d", slot)
 				fmt.Fprintln(a.Writer, msg)
-				if _, err := a.Invoker.Invoke(2, "markEnd", []byte("prvKey")); err != nil {
+				if _, err := a.Invoker.Invoke(slot, "markEnd", []byte("prvKey")); err != nil {
 					msg := fmt.Sprintf("[markend agent] Unable to invoke 'markEnd' for slot %d: %s\n", slot, err)
 					a.ErrChan <- errors.New(msg)
 				}
