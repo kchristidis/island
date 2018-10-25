@@ -25,7 +25,6 @@ type Notifier interface {
 type Agent struct {
 	DoneChan  chan struct{}
 	ErrChan   chan error
-	ID        int
 	Invoker   Invoker
 	MarkQueue chan int
 	Notifier  Notifier
@@ -51,13 +50,13 @@ func (a *Agent) Run() error {
 	msg := fmt.Sprint("Markend agent exited")
 	defer fmt.Fprintln(a.Writer, msg)
 
-	if ok := a.Notifier.Register(a.ID, a.SlotQueue); !ok {
+	if ok := a.Notifier.Register(-1, a.SlotQueue); !ok {
 		msg := fmt.Sprint("Markend agent unable to register with signaler")
 		fmt.Fprintln(a.Writer, msg)
 		return errors.New(msg)
 	}
 
-	msg = fmt.Sprintf("Markend agent %d registered with signaler", a.ID)
+	msg = fmt.Sprintf("Markend agentregistered with signaler")
 	fmt.Fprintln(a.Writer, msg)
 
 	go func() {
@@ -82,12 +81,13 @@ func (a *Agent) Run() error {
 			fmt.Fprintln(a.Writer, err.Error())
 			return err
 		case slot := <-a.SlotQueue:
-			msg := fmt.Sprintf("Markend agent processing slot %d", slot)
+			prevSlot := slot - 1
+			msg := fmt.Sprintf("Markend agent processing slot %d", prevSlot)
 			fmt.Fprintln(a.Writer, msg)
 			select {
-			case a.MarkQueue <- slot:
+			case a.MarkQueue <- prevSlot:
 			default:
-				msg := fmt.Sprintf("Markend agent unable to push slot %d to 'mark' queue (size: %d)", slot, len(a.MarkQueue))
+				msg := fmt.Sprintf("Markend agent unable to push slot %d to 'mark' queue (size: %d)", prevSlot, len(a.MarkQueue))
 				fmt.Fprintln(a.Writer, msg)
 				return errors.New(msg)
 			}

@@ -83,8 +83,8 @@ func TestAgent(t *testing.T) {
 		invoker.InvokeReturns(nil, nil)
 		m.SlotQueue <- 0
 
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("processing slot 0"))
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("invoking 'markEnd' for slot 0"))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("processing slot -1"))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("invoking 'markEnd' for slot -1"))
 
 		close(donec)
 		<-deadc
@@ -111,7 +111,7 @@ func TestAgent(t *testing.T) {
 		invoker.InvokeReturns(nil, errors.New("foo"))
 		m.SlotQueue <- 0
 
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("unable to invoke 'markEnd' for slot 0"))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("unable to invoke 'markEnd' for slot -1"))
 
 		close(donec)
 		<-deadc
@@ -138,7 +138,7 @@ func TestAgent(t *testing.T) {
 		m.MarkQueue = nil
 		m.SlotQueue <- 0
 
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("unable to push slot 0 to 'mark' queue"))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("unable to push slot -1 to 'mark' queue"))
 
 		close(donec)
 		<-deadc
