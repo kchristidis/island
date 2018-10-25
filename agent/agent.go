@@ -72,12 +72,12 @@ func (a *Agent) Run() error {
 	defer fmt.Fprintln(a.Writer, msg)
 
 	if ok := a.Notifier.Register(a.ID, a.SlotQueue); !ok {
-		msg := fmt.Sprintf("[agent %d] Unable to register with signaler", a.ID)
+		msg := fmt.Sprintf("[agent %d] Unable to register with slot notifier", a.ID)
 		fmt.Fprintln(a.Writer, msg)
 		return errors.New(msg)
 	}
 
-	msg = fmt.Sprintf("[agent %d] Registered with signaler", a.ID)
+	msg = fmt.Sprintf("[agent %d] Registered with slot notifier", a.ID)
 	fmt.Fprintln(a.Writer, msg)
 
 	go func() {
