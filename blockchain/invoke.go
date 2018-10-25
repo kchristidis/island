@@ -3,7 +3,6 @@ package blockchain
 import (
 	"fmt"
 	"math/rand"
-	"os"
 	"strconv"
 	"time"
 
@@ -19,7 +18,7 @@ func (sc *SDKContext) Invoke(slot int, action string, dataB []byte) ([]byte, err
 	actionB := []byte(action)
 	slotB := []byte(strconv.Itoa(slot))
 
-	fmt.Fprintf(os.Stdout, "[%s] %s @ %d\n", eventB, action, slot)
+	// fmt.Fprintf(os.Stdout, "[%s] %s @ %d\n", eventB, action, slot)
 
 	reg, notifier, err := sc.EventClient.RegisterChaincodeEvent(sc.ChaincodeID, string(eventB))
 	if err != nil {
