@@ -33,13 +33,18 @@ func (n *Notifier) Register(id int, queue chan int) bool {
 
 // Run ...
 func (n *Notifier) Run() {
-	defer fmt.Fprintln(n.Writer, "Slot notifier exited")
+	defer fmt.Fprintln(n.Writer, "[slot notifier] Exited")
+
+	msg := fmt.Sprint("[slot notifier] Running")
+	fmt.Fprintln(n.Writer, msg)
 
 	for {
 		select {
 		case <-n.DoneChan:
 			return
 		case newVal := <-n.SourceChan:
+			msg := fmt.Sprintf("[slot notifier] Received slot %d from block notifier", newVal)
+			fmt.Fprintln(n.Writer, msg)
 			if newVal > n.LastVal {
 				n.LastVal = newVal
 				n.Subs.Range(func(k, v interface{}) bool {
