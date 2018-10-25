@@ -38,7 +38,7 @@ type Notifier struct {
 
 // Run ...
 func (n *Notifier) Run() error {
-	msg := fmt.Sprint("Block notifier running")
+	msg := fmt.Sprint("[block notifier] Running")
 	fmt.Fprintln(n.Writer, msg)
 
 	go func() {
@@ -60,35 +60,42 @@ func (n *Notifier) Run() error {
 		default:
 			resp, err := n.Querier.QueryInfo()
 			if err != nil {
-				msg := fmt.Sprintf("Unable to query ledger: %s", err.Error())
+				msg := fmt.Sprintf("[block notifier] Unable to query ledger: %s", err.Error())
 				fmt.Fprintln(n.Writer, msg)
 				return err
 			}
 			inHeight := resp.BCI.GetHeight()
-			msg := fmt.Sprintf("Block %d committed at the peer", int(inHeight))
-			fmt.Fprintln(n.Writer, msg)
-			if inHeight >= n.StartFromBlock {
-				switch n.LastHeight {
-				case 0: // nil value for LastHeight
-					if inHeight != n.StartFromBlock {
-						msg := fmt.Sprintf("WARNING: This is NOT the start block (%d)", int(n.LastHeight))
-						fmt.Println(n.Writer, msg)
-						return fmt.Errorf("Expected to start with block %d, got block %d instead", n.StartFromBlock, inHeight)
-					}
-					msg := fmt.Sprintf("This is the start block")
-					fmt.Println(n.Writer, msg)
-					n.LastSlot = int(inHeight - n.StartFromBlock) // should be 0
-					n.LastHeight = inHeight
-					n.OutChan <- n.LastSlot
+			switch n.LastHeight {
+			case 0: // If this is the case, then we haven't reached StartFromBlock yet
+				if inHeight < n.StartFromBlock {
 					continue
-				default:
-					if int(inHeight-n.LastHeight)%n.BlocksPerSlot == 0 {
-						n.LastSlot = int(inHeight-n.LastHeight) / n.BlocksPerSlot
-						n.LastHeight = inHeight
-						msg := fmt.Sprintf("Corresponds to slot %d", n.LastSlot)
-						fmt.Fprintln(n.Writer, msg)
-						n.OutChan <- n.LastSlot
-					}
+				}
+				msg := fmt.Sprintf("[block notifier] Block %d committed at the peer", int(inHeight))
+				fmt.Fprintln(n.Writer, msg)
+
+				if inHeight != n.StartFromBlock {
+					msg := fmt.Sprintf("[block notifier] WARNING: This is NOT the start block (%d)", int(n.LastHeight))
+					fmt.Println(n.Writer, msg)
+					return fmt.Errorf("[block notifier] Expected to start with block %d, got block %d instead", n.StartFromBlock, inHeight)
+				}
+
+				msg = fmt.Sprint("[block notifier] This is the start block")
+				fmt.Println(n.Writer, msg)
+
+				n.LastSlot = int(inHeight - n.StartFromBlock) // should be 0
+				n.LastHeight = inHeight
+				n.OutChan <- n.LastSlot
+			default: // We're hitting this case only after we've reached StartFromBlock
+				if inHeight <= n.LastHeight {
+					continue
+				}
+
+				if int(inHeight-n.LastHeight)%n.BlocksPerSlot == 0 {
+					n.LastSlot = int(inHeight-n.LastHeight) / n.BlocksPerSlot
+					n.LastHeight = inHeight
+					msg := fmt.Sprintf("[block notifier] Block corresponds to slot %d", n.LastSlot)
+					fmt.Fprintln(n.Writer, msg)
+					n.OutChan <- n.LastSlot
 				}
 			}
 			time.Sleep(n.SleepDuration)
