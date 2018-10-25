@@ -47,26 +47,26 @@ func New(invoker Invoker, notifier Notifier, donec chan struct{}, writer io.Writ
 
 // Run ...
 func (a *Agent) Run() error {
-	msg := fmt.Sprint("Markend agent exited")
+	msg := fmt.Sprint("[markend agent] Exited")
 	defer fmt.Fprintln(a.Writer, msg)
 
 	if ok := a.Notifier.Register(-1, a.SlotQueue); !ok {
-		msg := fmt.Sprint("Markend agent unable to register with signaler")
+		msg := fmt.Sprint("[markend agent] Unable to register with signaler")
 		fmt.Fprintln(a.Writer, msg)
 		return errors.New(msg)
 	}
 
-	msg = fmt.Sprintf("Markend agentregistered with signaler")
+	msg = fmt.Sprintf("[markend agent] Registered with signaler")
 	fmt.Fprintln(a.Writer, msg)
 
 	go func() {
 		for {
 			select {
 			case slot := <-a.MarkQueue:
-				msg := fmt.Sprintf("Markend agent invoking 'markEnd' for slot %d", slot)
+				msg := fmt.Sprintf("[markend agent] Invoking 'markEnd' for slot %d", slot)
 				fmt.Fprintln(a.Writer, msg)
 				if _, err := a.Invoker.Invoke(2, "markEnd", []byte("prvKey")); err != nil {
-					msg := fmt.Sprintf("Markend agent unable to invoke 'markEnd' for slot %d: %s\n", slot, err)
+					msg := fmt.Sprintf("[markend agent] Unable to invoke 'markEnd' for slot %d: %s\n", slot, err)
 					a.ErrChan <- errors.New(msg)
 				}
 			case <-a.DoneChan:
@@ -82,12 +82,12 @@ func (a *Agent) Run() error {
 			return err
 		case slot := <-a.SlotQueue:
 			prevSlot := slot - 1
-			msg := fmt.Sprintf("Markend agent processing slot %d", prevSlot)
+			msg := fmt.Sprintf("[markend agent] Processing slot %d", prevSlot)
 			fmt.Fprintln(a.Writer, msg)
 			select {
 			case a.MarkQueue <- prevSlot:
 			default:
-				msg := fmt.Sprintf("Markend agent unable to push slot %d to 'mark' queue (size: %d)", prevSlot, len(a.MarkQueue))
+				msg := fmt.Sprintf("[markend agent] Unable to push slot %d to 'mark' queue (size: %d)", prevSlot, len(a.MarkQueue))
 				fmt.Fprintln(a.Writer, msg)
 				return errors.New(msg)
 			}
