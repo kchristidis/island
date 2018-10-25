@@ -1,4 +1,4 @@
-package slot
+package slotnotifier
 
 import (
 	"fmt"
