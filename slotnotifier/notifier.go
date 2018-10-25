@@ -50,6 +50,8 @@ func (n *Notifier) Run() {
 				n.Subs.Range(func(k, v interface{}) bool {
 					select {
 					case v.(chan int) <- n.LastVal:
+						// msg := fmt.Sprintf("[slot notifier] Sent slot %d to agent %d", newVal, k.(int))
+						// fmt.Fprintln(n.Writer, msg)
 						return true
 					default:
 						return false
