@@ -1,13 +1,19 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
+	"io"
 	"os"
+	"path/filepath"
+	"sync"
 	"time"
 
-	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
+	"github.com/kchristidis/exp2/agent"
 	"github.com/kchristidis/exp2/blockchain"
+	"github.com/kchristidis/exp2/blocknotifier"
+	"github.com/kchristidis/exp2/csv"
+	"github.com/kchristidis/exp2/markend"
+	"github.com/kchristidis/exp2/slotnotifier"
 )
 
 func main() {
@@ -18,7 +24,44 @@ func main() {
 }
 
 func run() error {
-	sc := blockchain.SDKContext{
+	var (
+		err error
+
+		agents        []*agent.Agent
+		bnotifier     *blocknotifier.Notifier
+		blocksperslot int
+		clockperiod   time.Duration
+		donec         chan struct{}
+		heightc       chan int
+		markendagent  *markend.Agent
+		once          sync.Once
+		sdkctx        *blockchain.SDKContext
+		snotifier     *slotnotifier.Notifier
+		startblock    uint64
+		trace         map[int][][]float64
+		wg1, wg2      sync.WaitGroup
+		writer        io.Writer
+	)
+
+	// Global vars
+
+	blocksperslot = 3
+	clockperiod = 500 * time.Millisecond
+	donec = make(chan struct{}) // acts as a coordination signal for goroutines
+	startblock = uint64(10)
+	writer = os.Stdout
+
+	// Load the trace
+
+	path := filepath.Join("csv", csv.Filename)
+	trace, err = csv.Load(path)
+	if err != nil {
+		return nil
+	}
+
+	// Set up the SDK
+
+	sdkctx = &blockchain.SDKContext{
 		SDKConfigFile: "config.yaml",
 
 		OrgName:  "clark",
@@ -34,86 +77,93 @@ func run() error {
 		ChaincodeSourcePath: "github.com/kchristidis/exp2/chaincode/",
 	}
 
-	if err := sc.Setup(); err != nil {
+	if err = sdkctx.Setup(); err != nil {
 		return err
 	}
-	defer sc.SDK.Close()
+	defer sdkctx.SDK.Close()
 
-	if err := sc.Install(); err != nil {
+	if err = sdkctx.Install(); err != nil {
 		return err
 	}
 
-	// Get notified when a new block is added to the peer's chain
+	// Set up the slot notifier
 
-	heightChan := make(chan uint64)
-	doneChan := make(chan struct{})
+	heightc = make(chan int)
+	snotifier = slotnotifier.New(heightc, donec, writer)
 
+	// Set up and launch the agents
+
+	markendagent = markend.New(sdkctx, snotifier, donec, writer)
+	wg2.Add(1)
 	go func() {
-		var lastHeight uint64
-		var resp *fab.BlockchainInfoResponse
-		var err error
-		for {
-			resp, err = sc.LedgerClient.QueryInfo()
-			if err != nil {
-				msg := fmt.Sprintf("Unable to query ledger: %s", err.Error())
-				fmt.Fprintln(os.Stdout, msg)
-				close(doneChan)
-				return
-			}
-			if tempHeight := resp.BCI.GetHeight(); tempHeight != lastHeight {
-				lastHeight = tempHeight
-				heightChan <- lastHeight
-			}
-			time.Sleep(100 * time.Millisecond)
+		if err := markendagent.Run(); err != nil {
+			once.Do(func() {
+				close(donec)
+			})
 		}
+		wg2.Done()
 	}()
 
-	go func() {
-		for {
-			select {
-			case val := <-heightChan:
-				fmt.Fprintf(os.Stdout, ">>> current blockchain height: %d\n", val)
-			case <-doneChan:
-				fmt.Fprintln(os.Stdout, "Goroutine exiting")
-				return
+	agents = make([]*agent.Agent, csv.IDCount)
+	// for i, ID := range csv.IDs {
+	for i, ID := range []int{171, 1103} {
+		agents[i] = agent.New(ID, trace[ID], sdkctx, snotifier, donec, writer)
+		wg1.Add(1)
+		go func(i int) {
+			if err = agents[i].Run(); err != nil {
+				once.Do(func() {
+					close(donec)
+				})
 			}
+			wg1.Done()
+		}(i)
+	}
+
+	// Set up and launch the block notifier
+
+	bnotifier = &blocknotifier.Notifier{
+		BlocksPerSlot:  blocksperslot,
+		ClockPeriod:    clockperiod,
+		DoneChan:       donec,
+		Invoker:        sdkctx,
+		OutChan:        heightc,
+		Querier:        sdkctx.LedgerClient,
+		StartFromBlock: startblock,
+		SleepDuration:  100 * time.Millisecond,
+		Writer:         writer,
+	}
+
+	wg2.Add(1)
+	go func() {
+		if err := bnotifier.Run(); err != nil {
+			once.Do(func() {
+				close(donec)
+			})
 		}
+		wg2.Done()
 	}()
 
-	defer close(doneChan)
+	// Launch the slot notifier
+
+	wg2.Add(1)
+	go func() {
+		snotifier.Run()
+		wg2.Done()
+	}()
 
 	// Start the simulation
-
-	println()
-
-	var bid []byte
-
-	bid, _ = json.Marshal([]float64{6.5, 2})
-	_, err := sc.Invoke(2, "buy", bid)
-	if err != nil {
-		return err
-	}
-
-	bid, _ = json.Marshal([]float64{10, 2})
-	sc.Invoke(2, "buy", bid)
-
-	bid, _ = json.Marshal([]float64{6.5, 2})
-	sc.Invoke(2, "sell", bid)
-
-	bid, _ = json.Marshal([]float64{11, 2})
-	sc.Invoke(2, "sell", bid)
-
-	resp, _ := sc.Invoke(2, "markEnd", []byte("prvKey"))
-	fmt.Fprintf(os.Stdout, "%s\n", resp)
-
-	bid, _ = json.Marshal([]float64{6.5, 2})
-	sc.Invoke(2, "sell", bid)
 
 	/* if resp, err := sc.Query(2, "bid"); err != nil {
 		return err
 	} else {
 		fmt.Fprintf(os.Stdout, "Response from chaincode query for '2/bid': %s\n", resp)
 	} */
+
+	wg1.Wait()
+	once.Do(func() {
+		close(donec)
+	})
+	wg2.Wait()
 
 	fmt.Fprintf(os.Stdout, "Run completed successfully 😎")
 
