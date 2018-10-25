@@ -79,9 +79,6 @@ func (n *Notifier) Run() error {
 					return fmt.Errorf("[block notifier] Expected to start with block %d, got block %d instead", n.StartFromBlock, inHeight)
 				}
 
-				msg = fmt.Sprint("[block notifier] This is the start block")
-				fmt.Println(n.Writer, msg)
-
 				n.LastSlot = int(inHeight - n.StartFromBlock) // should be 0
 				n.LastHeight = inHeight
 				n.OutChan <- n.LastSlot
@@ -90,10 +87,12 @@ func (n *Notifier) Run() error {
 					continue
 				}
 
-				if int(inHeight-n.LastHeight)%n.BlocksPerSlot == 0 {
-					n.LastSlot = int(inHeight-n.LastHeight) / n.BlocksPerSlot
+				if int(inHeight-n.StartFromBlock)%n.BlocksPerSlot == 0 {
+					msg := fmt.Sprintf("[block notifier] Block %d committed at the peer", int(inHeight))
+					fmt.Fprintln(n.Writer, msg)
+					n.LastSlot = int(inHeight-n.StartFromBlock) / n.BlocksPerSlot
 					n.LastHeight = inHeight
-					msg := fmt.Sprintf("[block notifier] Block corresponds to slot %d", n.LastSlot)
+					msg = fmt.Sprintf("[block notifier] Block corresponds to slot %d", n.LastSlot)
 					fmt.Fprintln(n.Writer, msg)
 					n.OutChan <- n.LastSlot
 				}
