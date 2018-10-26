@@ -65,9 +65,13 @@ func (a *Agent) Run() error {
 			case slot := <-a.MarkQueue:
 				msg := fmt.Sprintf("[markend agent] Invoking 'markEnd' for slot %d", slot)
 				fmt.Fprintln(a.Writer, msg)
-				if _, err := a.Invoker.Invoke(slot, "markEnd", []byte("prvKey")); err != nil {
+				resp, err := a.Invoker.Invoke(slot, "markEnd", []byte("prvKey"))
+				if err != nil {
 					msg := fmt.Sprintf("[markend agent] Unable to invoke 'markEnd' for slot %d: %s\n", slot, err)
 					a.ErrChan <- errors.New(msg)
+				} else {
+					msg := fmt.Sprintf("[markend agent] invocation response: %s\n", resp)
+					fmt.Fprintf(a.Writer, msg)
 				}
 			case <-a.DoneChan:
 				return
