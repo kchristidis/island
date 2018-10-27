@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/rsa"
 	"fmt"
 	"io"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"github.com/kchristidis/exp2/agent"
 	"github.com/kchristidis/exp2/blockchain"
 	"github.com/kchristidis/exp2/blocknotifier"
+	"github.com/kchristidis/exp2/crypto"
 	"github.com/kchristidis/exp2/csv"
 	"github.com/kchristidis/exp2/markend"
 	"github.com/kchristidis/exp2/slotnotifier"
@@ -25,8 +27,7 @@ func main() {
 
 func run() error {
 	var (
-		err error
-
+		err           error
 		agents        []*agent.Agent
 		bnotifier     *blocknotifier.Notifier
 		blocksperslot int
@@ -35,6 +36,8 @@ func run() error {
 		heightc       chan int
 		markendagent  *markend.Agent
 		once          sync.Once
+		privkeybytes  []byte
+		pubkey        *rsa.PublicKey
 		sdkctx        *blockchain.SDKContext
 		snotifier     *slotnotifier.Notifier
 		startblock    uint64
@@ -42,6 +45,12 @@ func run() error {
 		wg1, wg2      sync.WaitGroup
 		writer        io.Writer
 	)
+
+	// Stats
+	/* var (
+		BytesPerBlock                 []int
+		LatenciesPerBidInMilliseconds []int
+	) */
 
 	// Global vars
 
@@ -53,11 +62,26 @@ func run() error {
 
 	// Load the trace
 
-	path := filepath.Join("csv", csv.Filename)
-	trace, err = csv.Load(path)
+	tracepath := filepath.Join("csv", csv.Filename)
+	trace, err = csv.Load(tracepath)
 	if err != nil {
 		return nil
 	}
+
+	// Load the keys
+
+	pubkeypath := filepath.Join("crypto", "pub.pem")
+	pubkey, err = crypto.LoadPublic(pubkeypath)
+	if err != nil {
+		return nil
+	}
+
+	privkeypath := filepath.Join("crypto", "priv.pem")
+	privkey, err := crypto.LoadPrivate(privkeypath)
+	if err != nil {
+		return nil
+	}
+	privkeybytes = crypto.SerializePrivate(privkey)
 
 	// Set up the SDK
 
@@ -93,7 +117,7 @@ func run() error {
 
 	// Set up and launch the agents
 
-	markendagent = markend.New(sdkctx, snotifier, donec, writer)
+	markendagent = markend.New(sdkctx, snotifier, privkeybytes, donec, writer)
 	wg2.Add(1)
 	go func() {
 		if err := markendagent.Run(); err != nil {
@@ -105,9 +129,8 @@ func run() error {
 	}()
 
 	agents = make([]*agent.Agent, csv.IDCount)
-	// for i, ID := range csv.IDs {
-	for i, ID := range []int{171, 1103} {
-		agents[i] = agent.New(ID, trace[ID], sdkctx, snotifier, donec, writer)
+	for i, ID := range csv.IDs { // ATTN: Temporary modification: []int{171, 1103}
+		agents[i] = agent.New(ID, trace[ID], sdkctx, snotifier, pubkey, donec, writer)
 		wg1.Add(1)
 		go func(i int) {
 			if err = agents[i].Run(); err != nil {
