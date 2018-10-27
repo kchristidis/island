@@ -4,15 +4,29 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
+	"sync"
 
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 	pp "github.com/hyperledger/fabric/protos/peer"
 )
 
+// EnableEvents ...
+const EnableEvents = false
+
 var (
-	buyerBids, sellerBids BidCollection // Set and cleared @ every slot
-	results               = make(map[string]string)
+	buyerBids, sellerBids map[int]BidCollection
+	bbMutex, sbMutex      sync.RWMutex
 )
+
+// Stats
+/* var (
+	tradedEnergyPerSlot                  [35036]float32 // Goal: allocative efficiency
+	tradedElectricityCostPerSlot         [35036]float32 // Goal: total electricity cost per slot and overall
+	lateTransactionsPerslot              [35036]int     // Goal: percentage of transactions that didn't make it on time
+	lateBidTransactionsPerSlot           [35036]int     // Same goal as above
+	lateDecryptionKeyTransactionsPerSlot [35036]int     // As above
+) */
 
 func main() {
 	if err := shim.Start(new(contract)); err != nil {
@@ -25,6 +39,8 @@ type contract struct{}
 
 // Init carries initialization logic for the chaincode. It is automatically invoked during chaincode instantiation.
 func (c *contract) Init(stub shim.ChaincodeStubInterface) pp.Response {
+	buyerBids = make(map[int]BidCollection)
+	sellerBids = make(map[int]BidCollection)
 	return shim.Success(nil) // A no-op for now
 }
 
@@ -62,8 +78,11 @@ func newOpContext(stub shim.ChaincodeStubInterface) (*opContext, error) {
 		data:    args[4],
 	}
 
-	msg := fmt.Sprintf("[%s] Action '%s' @ slot '%s'", oc.txID, oc.action, oc.slot)
-	fmt.Fprintln(os.Stdout, msg)
+	switch oc.action {
+	case "buy", "sell", "markEnd":
+		msg := fmt.Sprintf("[%s] Action '%s' @ slot '%s'", oc.txID, oc.action, oc.slot)
+		fmt.Fprintln(os.Stdout, msg)
+	}
 
 	return oc, nil
 }
@@ -140,20 +159,28 @@ func (oc *opContext) bid() pp.Response {
 		Units:        bidData[1],
 	}
 
+	slotNum, _ := strconv.Atoi(oc.slot)
+
 	// Add bid to bid collection
 	switch oc.action {
 	case "buy":
-		buyerBids = append(buyerBids, bid)
+		bbMutex.Lock()
+		buyerBids[slotNum] = append(buyerBids[slotNum], bid)
+		bbMutex.Unlock()
 	case "sell":
-		sellerBids = append(sellerBids, bid)
+		sbMutex.Lock()
+		sellerBids[slotNum] = append(sellerBids[slotNum], bid)
+		sbMutex.Unlock()
 	}
 
-	// Notify listeners that the event has been executed
-	err = oc.stub.SetEvent(oc.eventID, nil)
-	if err != nil {
-		msg := fmt.Sprintf("[%s] Cannot create event: %s", oc.txID, err.Error())
-		fmt.Fprintln(os.Stdout, msg)
-		return shim.Error(msg)
+	if EnableEvents {
+		// Notify listeners that the event has been executed
+		err = oc.stub.SetEvent(oc.eventID, nil)
+		if err != nil {
+			msg := fmt.Sprintf("[%s] Cannot create event: %s", oc.txID, err.Error())
+			fmt.Fprintln(os.Stdout, msg)
+			return shim.Error(msg)
+		}
 	}
 
 	return shim.Success([]byte(k2))
@@ -175,28 +202,48 @@ func (oc *opContext) markEnd() pp.Response {
 
 	var respPayload []byte
 
-	// Settle the market for that slot
-	if len(sellerBids) > 0 && len(buyerBids) > 0 {
-		//msg := fmt.Sprintf("Buyer bids: %v", buyerBids)
-		// fmt.Fprintln(os.Stdout, msg)
-		// msg = fmt.Sprintf("Seller bids: %v", sellerBids)
-		// fmt.Fprintln(os.Stdout, msg)
+	slotNum, _ := strconv.Atoi(oc.slot)
 
-		res, err := Settle(buyerBids, sellerBids)
+	bbMutex.RLock()
+	defer bbMutex.RUnlock()
+	sbMutex.RLock()
+	defer sbMutex.RUnlock()
+
+	msg := fmt.Sprintf("[%s] Buyer bids for slot %d:", oc.txID, slotNum)
+	fmt.Fprintln(os.Stdout, msg)
+	if len(buyerBids[slotNum]) > 0 {
+		for i, v := range buyerBids[slotNum] {
+			fmt.Fprintf(os.Stdout, "%2d: %s\n", i, v)
+		}
+	} else {
+		fmt.Fprintln(os.Stdout, "\tnone")
+	}
+
+	msg = fmt.Sprintf("[%s] Seller bids for slot %d:", oc.txID, slotNum)
+	fmt.Fprintln(os.Stdout, msg)
+	if len(sellerBids[slotNum]) > 0 {
+		for i, v := range sellerBids[slotNum] {
+			fmt.Fprintf(os.Stdout, "%2d: %s\n", i, v)
+		}
+	} else {
+		fmt.Fprintln(os.Stdout, "\tnone")
+	}
+
+	// Settle the market for that slot
+	if len(sellerBids[slotNum]) > 0 && len(buyerBids[slotNum]) > 0 {
+		res, err := Settle(buyerBids[slotNum], sellerBids[slotNum])
 		if err != nil {
 			msg := fmt.Sprintf("[%s] Cannot find clearing price for slot %s: %s", oc.txID, oc.slot, err.Error())
 			fmt.Fprintln(os.Stdout, msg)
 		} else {
 			writeVal.ppu = res.PricePerUnit
 			writeVal.units = res.Units
-			msg := fmt.Sprintf("[%s] %.2f kWh were cleared at %.2f ç/kWh in slot %s ✅", oc.txID, writeVal.units, writeVal.ppu, oc.slot)
+			msg := fmt.Sprintf("[%s] %.6f kWh were cleared at %.2f ç/kWh in slot %s ✅", oc.txID, writeVal.units, writeVal.ppu, oc.slot)
 			fmt.Fprintln(os.Stdout, msg)
 			respPayload = []byte(msg)
-
-			// Reset for the next slot
-			buyerBids = BidCollection{}
-			sellerBids = BidCollection{}
 		}
+	} else {
+		respPayload = []byte(fmt.Sprintf("No market for slot %d (buyer bids: %d, seller bids: %d)", slotNum, len(buyerBids[slotNum]), len(sellerBids[slotNum])))
 	}
 
 	writeVal.privKey = string(oc.data)
@@ -214,12 +261,14 @@ func (oc *opContext) markEnd() pp.Response {
 		return shim.Error(msg)
 	}
 
-	// Notify listeners that the event has been executed
-	err = oc.stub.SetEvent(oc.eventID, nil)
-	if err != nil {
-		msg := fmt.Sprintf("[%s] Cannot create event: %s", oc.txID, err.Error())
-		fmt.Fprintln(os.Stdout, msg)
-		return shim.Error(msg)
+	if EnableEvents {
+		// Notify listeners that the event has been executed
+		err = oc.stub.SetEvent(oc.eventID, nil)
+		if err != nil {
+			msg := fmt.Sprintf("[%s] Cannot create event: %s", oc.txID, err.Error())
+			fmt.Fprintln(os.Stdout, msg)
+			return shim.Error(msg)
+		}
 	}
 
 	return shim.Success(respPayload)
@@ -240,12 +289,14 @@ func (oc *opContext) clock() pp.Response {
 		return shim.Error(msg)
 	}
 
-	// Notify listeners that the event has been executed
-	err = oc.stub.SetEvent(oc.eventID, nil)
-	if err != nil {
-		msg := fmt.Sprintf("[%s] Cannot create event: %s", oc.txID, err.Error())
-		fmt.Fprintln(os.Stdout, msg)
-		return shim.Error(msg)
+	if EnableEvents {
+		// Notify listeners that the event has been executed
+		err = oc.stub.SetEvent(oc.eventID, nil)
+		if err != nil {
+			msg := fmt.Sprintf("[%s] Cannot create event: %s", oc.txID, err.Error())
+			fmt.Fprintln(os.Stdout, msg)
+			return shim.Error(msg)
+		}
 	}
 
 	return shim.Success([]byte(k))
