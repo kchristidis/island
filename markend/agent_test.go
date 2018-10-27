@@ -2,8 +2,12 @@ package markend_test
 
 import (
 	"errors"
+	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/kchristidis/exp2/crypto"
 	"github.com/kchristidis/exp2/markend"
 	"github.com/kchristidis/exp2/markend/markendfakes"
 	"github.com/onsi/gomega/gbytes"
@@ -14,13 +18,18 @@ import (
 func TestAgent(t *testing.T) {
 	g := NewGomegaWithT(t)
 
+	privkeypath := filepath.Join("..", "crypto", "priv.pem")
+	privkey, err := crypto.LoadPrivate(privkeypath)
+	require.NoError(t, err)
+	privkeybytes := crypto.SerializePrivate(privkey)
+
 	t.Run("notifier registration fails", func(t *testing.T) {
 		invoker := new(markendfakes.FakeInvoker)
 		slotnotifier := new(markendfakes.FakeNotifier)
 		donec := make(chan struct{})
 		bfr := gbytes.NewBuffer()
 
-		m := markend.New(invoker, slotnotifier, donec, bfr)
+		m := markend.New(invoker, slotnotifier, privkeybytes, donec, bfr)
 
 		slotnotifier.RegisterReturns(false)
 
@@ -31,7 +40,7 @@ func TestAgent(t *testing.T) {
 			close(deadc)
 		}()
 
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Unable to register with signaler"))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Unable to register with slot notifier"))
 		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Exited"))
 
 		close(donec)
@@ -45,7 +54,7 @@ func TestAgent(t *testing.T) {
 		donec := make(chan struct{})
 		bfr := gbytes.NewBuffer()
 
-		m := markend.New(invoker, slotnotifier, donec, bfr)
+		m := markend.New(invoker, slotnotifier, privkeybytes, donec, bfr)
 
 		slotnotifier.RegisterReturns(true)
 
@@ -69,7 +78,7 @@ func TestAgent(t *testing.T) {
 		donec := make(chan struct{})
 		bfr := gbytes.NewBuffer()
 
-		m := markend.New(invoker, slotnotifier, donec, bfr)
+		m := markend.New(invoker, slotnotifier, privkeybytes, donec, bfr)
 
 		slotnotifier.RegisterReturns(true)
 
@@ -97,7 +106,7 @@ func TestAgent(t *testing.T) {
 		donec := make(chan struct{})
 		bfr := gbytes.NewBuffer()
 
-		m := markend.New(invoker, slotnotifier, donec, bfr)
+		m := markend.New(invoker, slotnotifier, privkeybytes, donec, bfr)
 
 		slotnotifier.RegisterReturns(true)
 
@@ -124,7 +133,7 @@ func TestAgent(t *testing.T) {
 		donec := make(chan struct{})
 		bfr := gbytes.NewBuffer()
 
-		m := markend.New(invoker, slotnotifier, donec, bfr)
+		m := markend.New(invoker, slotnotifier, privkeybytes, donec, bfr)
 
 		slotnotifier.RegisterReturns(true)
 

@@ -23,25 +23,27 @@ type Notifier interface {
 
 // Agent ...
 type Agent struct {
-	DoneChan  chan struct{}
-	ErrChan   chan error
-	Invoker   Invoker
-	MarkQueue chan int
-	Notifier  Notifier
-	SlotQueue chan int // this is the agent's trigger, i.e. it's supposed to act whenever a new slot is created
-	Writer    io.Writer
+	DoneChan     chan struct{}
+	ErrChan      chan error
+	Invoker      Invoker
+	MarkQueue    chan int
+	Notifier     Notifier
+	PrivKeyBytes []byte
+	SlotQueue    chan int // this is the agent's trigger, i.e. it's supposed to act whenever a new slot is created
+	Writer       io.Writer
 }
 
 // New ...
-func New(invoker Invoker, notifier Notifier, donec chan struct{}, writer io.Writer) *Agent {
+func New(invoker Invoker, notifier Notifier, privKeyBytes []byte, donec chan struct{}, writer io.Writer) *Agent {
 	return &Agent{
-		DoneChan:  donec,
-		ErrChan:   make(chan error),
-		Invoker:   invoker,
-		MarkQueue: make(chan int, BufferLen),
-		Notifier:  notifier,
-		SlotQueue: make(chan int, BufferLen),
-		Writer:    writer,
+		DoneChan:     donec,
+		ErrChan:      make(chan error),
+		Invoker:      invoker,
+		MarkQueue:    make(chan int, BufferLen),
+		Notifier:     notifier,
+		PrivKeyBytes: privKeyBytes,
+		SlotQueue:    make(chan int, BufferLen),
+		Writer:       writer,
 	}
 }
 
@@ -65,12 +67,12 @@ func (a *Agent) Run() error {
 			case slot := <-a.MarkQueue:
 				msg := fmt.Sprintf("[markend agent] Invoking 'markEnd' for slot %d", slot)
 				fmt.Fprintln(a.Writer, msg)
-				resp, err := a.Invoker.Invoke(slot, "markEnd", []byte("prvKey"))
+				resp, err := a.Invoker.Invoke(slot, "markEnd", a.PrivKeyBytes)
 				if err != nil {
 					msg := fmt.Sprintf("[markend agent] Unable to invoke 'markEnd' for slot %d: %s\n", slot, err)
 					a.ErrChan <- errors.New(msg)
 				} else {
-					msg := fmt.Sprintf("[markend agent] invocation response: %s\n", resp)
+					msg := fmt.Sprintf("[markend agent] invocation response:\n\t%s\n", resp)
 					fmt.Fprintf(a.Writer, msg)
 				}
 			case <-a.DoneChan:
