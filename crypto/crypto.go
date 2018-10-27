@@ -53,6 +53,26 @@ func SerializePublic(pubKey *rsa.PublicKey) []byte {
 	)
 }
 
+// DeserializePrivate decodes a PEM-encoded private key.
+func DeserializePrivate(privBytes []byte) (*rsa.PrivateKey, error) {
+	pemBlock, _ := pem.Decode(privBytes)
+	if pemBlock == nil {
+		return nil, fmt.Errorf("Failed to parse PEM block from given input")
+	}
+
+	return x509.ParsePKCS1PrivateKey(pemBlock.Bytes)
+}
+
+// DeserializePublic decodes a PEM-encoded public key.
+func DeserializePublic(pubBytes []byte) (*rsa.PublicKey, error) {
+	pemBlock, _ := pem.Decode(pubBytes)
+	if pemBlock == nil {
+		return nil, fmt.Errorf("Failed to parse PEM block from given input")
+	}
+
+	return x509.ParsePKCS1PublicKey(pemBlock.Bytes)
+}
+
 // PersistPublic persists the PEM encoding of a public key to disk.
 func PersistPublic(pubKey *rsa.PublicKey, filename string) error {
 	return ioutil.WriteFile(filename, SerializePublic(pubKey), 0644)
@@ -66,12 +86,7 @@ func LoadPrivate(filename string) (*rsa.PrivateKey, error) {
 		return nil, err
 	}
 
-	pemBlock, _ := pem.Decode(keyBytes)
-	if pemBlock == nil {
-		return nil, fmt.Errorf("Failed to parse PEM block in %s", filename)
-	}
-
-	return x509.ParsePKCS1PrivateKey(pemBlock.Bytes)
+	return DeserializePrivate(keyBytes)
 }
 
 // LoadPublic reads and decodes a PEM-encoded public key from disk.
@@ -81,10 +96,5 @@ func LoadPublic(filename string) (*rsa.PublicKey, error) {
 		return nil, err
 	}
 
-	pemBlock, _ := pem.Decode(keyBytes)
-	if pemBlock == nil {
-		return nil, fmt.Errorf("Failed to parse PEM block in %s", filename)
-	}
-
-	return x509.ParsePKCS1PublicKey(pemBlock.Bytes)
+	return DeserializePublic(keyBytes)
 }
