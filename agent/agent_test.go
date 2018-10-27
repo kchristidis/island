@@ -7,6 +7,7 @@ import (
 
 	"github.com/kchristidis/exp2/agent"
 	"github.com/kchristidis/exp2/agent/agentfakes"
+	"github.com/kchristidis/exp2/crypto"
 	"github.com/kchristidis/exp2/csv"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/stretchr/testify/require"
@@ -21,13 +22,17 @@ func TestAgent(t *testing.T) {
 	m, err := csv.Load(path)
 	require.NoError(t, err)
 
+	pubkeypath := filepath.Join("..", "crypto", "pub.pem")
+	pubkey, err := crypto.LoadPublic(pubkeypath)
+	require.NoError(t, err)
+
 	t.Run("notifier registration fails", func(t *testing.T) {
 		invoker := new(agentfakes.FakeInvoker)
 		slotnotifier := new(agentfakes.FakeNotifier)
 		donec := make(chan struct{})
 		bfr := gbytes.NewBuffer()
 
-		a := agent.New(csv.IDs[0], m[csv.IDs[0]], invoker, slotnotifier, donec, bfr)
+		a := agent.New(csv.IDs[0], m[csv.IDs[0]], invoker, slotnotifier, pubkey, donec, bfr)
 
 		slotnotifier.RegisterReturns(false)
 
@@ -38,7 +43,7 @@ func TestAgent(t *testing.T) {
 			close(deadc)
 		}()
 
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Unable to register with signaler"))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Unable to register with slot notifier"))
 		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Exited"))
 
 		close(donec)
@@ -52,7 +57,7 @@ func TestAgent(t *testing.T) {
 		donec := make(chan struct{})
 		bfr := gbytes.NewBuffer()
 
-		a := agent.New(csv.IDs[0], m[csv.IDs[0]], invoker, slotnotifier, donec, bfr)
+		a := agent.New(csv.IDs[0], m[csv.IDs[0]], invoker, slotnotifier, pubkey, donec, bfr)
 
 		slotnotifier.RegisterReturns(true)
 
@@ -76,7 +81,7 @@ func TestAgent(t *testing.T) {
 		donec := make(chan struct{})
 		bfr := gbytes.NewBuffer()
 
-		a := agent.New(csv.IDs[0], m[csv.IDs[0]], invoker, slotnotifier, donec, bfr)
+		a := agent.New(csv.IDs[0], m[csv.IDs[0]], invoker, slotnotifier, pubkey, donec, bfr)
 
 		slotnotifier.RegisterReturns(true)
 

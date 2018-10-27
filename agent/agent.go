@@ -1,11 +1,14 @@
 package agent
 
 import (
+	"crypto/rsa"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"math/rand"
+
+	"github.com/kchristidis/exp2/crypto"
 )
 
 // BufferLen ...
@@ -44,6 +47,7 @@ type Agent struct {
 	DoneChan  chan struct{}
 	ID        int
 	Invoker   Invoker
+	PubKey    *rsa.PublicKey
 	SellQueue chan int
 	SlotQueue chan int // this is the agent's trigger, i.e. it's supposed to act whenever a new slot is created
 	Notifier  Notifier
@@ -52,16 +56,17 @@ type Agent struct {
 }
 
 // New ...
-func New(id int, trace [][]float64, invoker Invoker, notifier Notifier, donec chan struct{}, writer io.Writer) *Agent {
+func New(id int, trace [][]float64, invoker Invoker, notifier Notifier, pubkey *rsa.PublicKey, donec chan struct{}, writer io.Writer) *Agent {
 	return &Agent{
 		BuyQueue:  make(chan int, BufferLen),
 		DoneChan:  donec,
 		ID:        id,
 		Invoker:   invoker,
+		PubKey:    pubkey,
 		SellQueue: make(chan int, BufferLen),
 		SlotQueue: make(chan int, BufferLen),
 		Notifier:  notifier,
-		Trace:     trace,
+		Trace:     trace[:1000], // ATTN: Temporary modification
 		Writer:    writer,
 	}
 }
@@ -126,7 +131,7 @@ func (a *Agent) Run() error {
 			}
 
 			// Return when you're done processing your trace
-			if rowIdx == len(a.Trace) {
+			if rowIdx == len(a.Trace)-1 {
 				return nil
 			}
 		case <-a.DoneChan:
@@ -141,10 +146,16 @@ func (a *Agent) Buy(rowIdx int) error {
 	if row[Use] > 0 {
 		ppu := row[Lo] + (row[Hi]-row[Lo])*(1.0-rand.Float64())
 		bid, _ := json.Marshal([]float64{ppu, row[Use] * ToKWh}) // first arg: PPU, second arg: QTY
-		msg := fmt.Sprintf("[agent %d] Invoking 'buy' for %.3f kWh (%.3f) at %.3f ç/kWh", a.ID, row[Use]*ToKWh, row[Use], ppu)
+		msg := fmt.Sprintf("[agent %d] Invoking 'buy' for %.3f kWh (%.3f) at %.3f ç/kWh @ slot %d", a.ID, row[Use]*ToKWh, row[Use], ppu, rowIdx)
 		fmt.Fprintln(a.Writer, msg)
-		if _, err := a.Invoker.Invoke(rowIdx, "buy", bid); err != nil {
-			msg := fmt.Sprintf("A[agent %d] Unable to invoke 'buy' for row %d: %s\n", a.ID, rowIdx, err)
+		encBid, err := crypto.Encrypt(bid, a.PubKey)
+		if err != nil {
+			msg := fmt.Sprintf("[agent %d] Unable to encrypt 'buy' for row %d: %s\n", a.ID, rowIdx, err)
+			fmt.Fprintln(a.Writer, msg)
+			return errors.New(msg)
+		}
+		if _, err := a.Invoker.Invoke(rowIdx, "buy", encBid); err != nil {
+			msg := fmt.Sprintf("[agent %d] Unable to invoke 'buy' for row %d: %s\n", a.ID, rowIdx, err)
 			fmt.Fprintln(a.Writer, msg)
 			return errors.New(msg)
 		}
@@ -158,9 +169,15 @@ func (a *Agent) Sell(rowIdx int) error {
 	if row[Gen] > 0 {
 		ppu := row[Lo] + (row[Hi]-row[Lo])*(1.0-rand.Float64())
 		bid, _ := json.Marshal([]float64{ppu, row[Gen] * ToKWh}) // first arg: PPU, second arg: QTY
-		msg := fmt.Sprintf("[agent %d] Invoking 'sell' for %.3f kWh (%.3f) at %.3f ç/kWh", a.ID, row[Gen]*ToKWh, row[Gen], ppu)
+		msg := fmt.Sprintf("[agent %d] Invoking 'sell' for %.3f kWh (%.3f) at %.3f ç/kWh @ slot %d", a.ID, row[Gen]*ToKWh, row[Gen], ppu, rowIdx)
 		fmt.Fprintln(a.Writer, msg)
-		if _, err := a.Invoker.Invoke(rowIdx, "sell", bid); err != nil {
+		encBid, err := crypto.Encrypt(bid, a.PubKey)
+		if err != nil {
+			msg := fmt.Sprintf("[agent %d] Unable to encrypt 'sell' for row %d: %s\n", a.ID, rowIdx, err)
+			fmt.Fprintln(a.Writer, msg)
+			return errors.New(msg)
+		}
+		if _, err := a.Invoker.Invoke(rowIdx, "sell", encBid); err != nil {
 			msg := fmt.Sprintf("[agent %d] Unable to invoke 'sell' for row %d: %s", a.ID, rowIdx, err)
 			fmt.Fprintln(a.Writer, msg)
 			return errors.New(msg)
