@@ -15,7 +15,9 @@ import (
 // EnableEvents ...
 const EnableEvents = false
 
-// Clear the market
+// BufferLen ...
+const BufferLen = 20
+
 var (
 	buyerBids, sellerBids map[int]BidCollection
 	bbMutex, sbMutex      sync.RWMutex
@@ -51,15 +53,6 @@ fgS1DfUCgYEAmx3sAJqR/mksm8jQXiduGe2L9IwYoWvvVL6GzMik58iuI2OtmjF8
 OSwjLClaBdvj45YrUN3/i5LiIvblup9QpqshyEbSuT5gvhuf3jVmb08TJszihVXJ
 p2j5extRQ8Ua4T37+7UdkZMvJLEps9ic+IlJWYwKt1qM+ZIZuuitmwU=
 -----END RSA PRIVATE KEY-----`)
-
-// Stats
-/* var (
-	tradedEnergyPerSlot                  [35036]float32 // Goal: allocative efficiency
-	tradedElectricityCostPerSlot         [35036]float32 // Goal: total electricity cost per slot and overall
-	lateTransactionsPerslot              [35036]int     // Goal: percentage of transactions that didn't make it on time
-	lateBidTransactionsPerSlot           [35036]int     // Same goal as above
-	lateDecryptionKeyTransactionsPerSlot [35036]int     // As above
-) */
 
 func main() {
 	if err := shim.Start(new(contract)); err != nil {
@@ -219,10 +212,22 @@ func (oc *opContext) bid() pp.Response {
 	case "buy":
 		bbMutex.Lock()
 		buyerBids[slotNum] = append(buyerBids[slotNum], bid)
+		// This allows us to only keep the last 100 slots in memory.
+		// We do not need the previous one as they have already been settled.
+		if deleteKey := (slotNum - BufferLen); deleteKey >= 0 {
+			if _, ok := buyerBids[deleteKey]; ok {
+				delete(buyerBids, deleteKey)
+			}
+		}
 		bbMutex.Unlock()
 	case "sell":
 		sbMutex.Lock()
 		sellerBids[slotNum] = append(sellerBids[slotNum], bid)
+		if deleteKey := (slotNum - BufferLen); deleteKey >= 0 {
+			if _, ok := buyerBids[deleteKey]; ok {
+				delete(buyerBids, deleteKey)
+			}
+		}
 		sbMutex.Unlock()
 	}
 
@@ -262,7 +267,7 @@ func (oc *opContext) markEnd() pp.Response {
 	sbMutex.RLock()
 	defer sbMutex.RUnlock()
 
-	msg := fmt.Sprintf("[%s] Buyer bids for slot %d:", oc.txID, slotNum)
+	msg = fmt.Sprintf("[%s] Buyer bids for slot %d:", oc.txID, slotNum)
 	fmt.Fprintln(os.Stdout, msg)
 	if len(buyerBids[slotNum]) > 0 {
 		for i, v := range buyerBids[slotNum] {
