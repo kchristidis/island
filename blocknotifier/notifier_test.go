@@ -19,27 +19,20 @@ func TestNotifier(t *testing.T) {
 
 	bfr := gbytes.NewBuffer()
 	invoker := new(blocknotifierfakes.FakeInvoker)
+	invoker.InvokeReturns(nil, nil)
 	querier := new(blocknotifierfakes.FakeQuerier)
 	resp := new(fab.BlockchainInfoResponse)
-
-	outc := make(chan int)
-	invoker.InvokeReturns(nil, nil)
 	resp.BCI = new(common.BlockchainInfo)
+	outc := make(chan int)
 
 	t.Run("early block received", func(t *testing.T) {
+		startblock := uint64(10)
+		blocksperslot := 1
+		clockperiod := 500 * time.Millisecond
+		sleepduration := 10 * time.Millisecond
 		donec := make(chan struct{})
 
-		n := &blocknotifier.Notifier{
-			BlocksPerSlot:  1,
-			ClockPeriod:    500 * time.Millisecond,
-			DoneChan:       donec,
-			Invoker:        invoker,
-			OutChan:        outc,
-			Querier:        querier,
-			SleepDuration:  10 * time.Millisecond,
-			StartFromBlock: 10,
-			Writer:         bfr,
-		}
+		n := blocknotifier.New(startblock, blocksperslot, clockperiod, sleepduration, invoker, querier, outc, donec, bfr)
 
 		resp.BCI.Height = n.StartFromBlock - 1
 		querier.QueryInfoReturns(resp, nil)
@@ -68,19 +61,13 @@ func TestNotifier(t *testing.T) {
 	})
 
 	t.Run("start block received", func(t *testing.T) {
+		startblock := uint64(10)
+		blocksperslot := 1
+		clockperiod := 500 * time.Millisecond
+		sleepduration := 10 * time.Millisecond
 		donec := make(chan struct{})
 
-		n := &blocknotifier.Notifier{
-			BlocksPerSlot:  1,
-			ClockPeriod:    500 * time.Millisecond,
-			DoneChan:       donec,
-			Invoker:        invoker,
-			OutChan:        outc,
-			Querier:        querier,
-			SleepDuration:  10 * time.Millisecond,
-			StartFromBlock: 10,
-			Writer:         bfr,
-		}
+		n := blocknotifier.New(startblock, blocksperslot, clockperiod, sleepduration, invoker, querier, outc, donec, bfr)
 
 		resp.BCI.Height = n.StartFromBlock
 		querier.QueryInfoReturns(resp, nil)
@@ -92,7 +79,7 @@ func TestNotifier(t *testing.T) {
 			close(deadc)
 		}()
 
-		// I expect to reveive the slot notification
+		// I expect to receive the slot notification
 
 		g.Eventually(func() int {
 			select {
@@ -111,19 +98,13 @@ func TestNotifier(t *testing.T) {
 	})
 
 	t.Run("first block received is larger than start", func(t *testing.T) {
+		startblock := uint64(10)
+		blocksperslot := 1
+		clockperiod := 500 * time.Millisecond
+		sleepduration := 10 * time.Millisecond
 		donec := make(chan struct{})
 
-		n := &blocknotifier.Notifier{
-			BlocksPerSlot:  1,
-			ClockPeriod:    500 * time.Millisecond,
-			DoneChan:       donec,
-			Invoker:        invoker,
-			OutChan:        outc,
-			Querier:        querier,
-			SleepDuration:  10 * time.Millisecond,
-			StartFromBlock: 10,
-			Writer:         bfr,
-		}
+		n := blocknotifier.New(startblock, blocksperslot, clockperiod, sleepduration, invoker, querier, outc, donec, bfr)
 
 		resp.BCI.Height = n.StartFromBlock + 1
 		querier.QueryInfoReturns(resp, nil)
@@ -151,19 +132,13 @@ func TestNotifier(t *testing.T) {
 	})
 
 	t.Run("query fails", func(t *testing.T) {
+		startblock := uint64(10)
+		blocksperslot := 1
+		clockperiod := 500 * time.Millisecond
+		sleepduration := 10 * time.Millisecond
 		donec := make(chan struct{})
 
-		n := &blocknotifier.Notifier{
-			BlocksPerSlot:  1,
-			ClockPeriod:    500 * time.Millisecond,
-			DoneChan:       donec,
-			Invoker:        invoker,
-			OutChan:        outc,
-			Querier:        querier,
-			SleepDuration:  10 * time.Millisecond,
-			StartFromBlock: 10,
-			Writer:         bfr,
-		}
+		n := blocknotifier.New(startblock, blocksperslot, clockperiod, sleepduration, invoker, querier, outc, donec, bfr)
 
 		querier.QueryInfoReturns(nil, errors.New("foo"))
 
@@ -181,20 +156,14 @@ func TestNotifier(t *testing.T) {
 		g.Expect(err).To(HaveOccurred())
 	})
 
-	t.Run("non-period block received", func(t *testing.T) {
+	t.Run("non-period block received (post init)", func(t *testing.T) {
+		startblock := uint64(10)
+		blocksperslot := 3
+		clockperiod := 500 * time.Millisecond
+		sleepduration := 10 * time.Millisecond
 		donec := make(chan struct{})
 
-		n := &blocknotifier.Notifier{
-			BlocksPerSlot:  3,
-			ClockPeriod:    500 * time.Millisecond,
-			DoneChan:       donec,
-			Invoker:        invoker,
-			OutChan:        outc,
-			Querier:        querier,
-			SleepDuration:  10 * time.Millisecond,
-			StartFromBlock: 10,
-			Writer:         bfr,
-		}
+		n := blocknotifier.New(startblock, blocksperslot, clockperiod, sleepduration, invoker, querier, outc, donec, bfr)
 
 		n.LastHeight = n.StartFromBlock
 
@@ -225,19 +194,13 @@ func TestNotifier(t *testing.T) {
 	})
 
 	t.Run("period block received", func(t *testing.T) {
+		startblock := uint64(10)
+		blocksperslot := 3
+		clockperiod := 500 * time.Millisecond
+		sleepduration := 10 * time.Millisecond
 		donec := make(chan struct{})
 
-		n := &blocknotifier.Notifier{
-			BlocksPerSlot:  3,
-			ClockPeriod:    500 * time.Millisecond,
-			DoneChan:       donec,
-			Invoker:        invoker,
-			OutChan:        outc,
-			Querier:        querier,
-			SleepDuration:  10 * time.Millisecond,
-			StartFromBlock: 10,
-			Writer:         bfr,
-		}
+		n := blocknotifier.New(startblock, blocksperslot, clockperiod, sleepduration, invoker, querier, outc, donec, bfr)
 
 		n.LastHeight = n.StartFromBlock
 

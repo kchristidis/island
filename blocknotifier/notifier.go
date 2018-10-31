@@ -3,6 +3,7 @@ package blocknotifier
 import (
 	"fmt"
 	"io"
+	"sync"
 	"time"
 
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/ledger"
@@ -18,6 +19,7 @@ type Invoker interface {
 // Querier ...
 //go:generate counterfeiter . Querier
 type Querier interface {
+	// QueryBlock(blockNumber uint64, options ...ledger.RequestOption) (*common.Block, error)
 	QueryInfo(opts ...ledger.RequestOption) (*fab.BlockchainInfoResponse, error)
 }
 
@@ -31,20 +33,53 @@ type Notifier struct {
 	LastSlot       int
 	OutChan        chan int
 	Querier        Querier
-	SleepDuration  time.Duration
+	SleepDuration  time.Duration // How often do you check for new blocks?
 	StartFromBlock uint64
 	Writer         io.Writer
+
+	wg       sync.WaitGroup
+	killChan chan struct{}
+}
+
+// New ...
+func New(startblock uint64, blocksperslot int, clockperiod time.Duration, sleepduration time.Duration,
+	invoker Invoker, querier Querier, heightc chan int,
+	donec chan struct{}, writer io.Writer) *Notifier {
+	return &Notifier{
+		BlocksPerSlot:  blocksperslot,
+		ClockPeriod:    clockperiod,
+		DoneChan:       donec,
+		Invoker:        invoker,
+		OutChan:        heightc,
+		Querier:        querier,
+		SleepDuration:  sleepduration,
+		StartFromBlock: startblock,
+		Writer:         writer,
+
+		killChan: make(chan struct{}),
+	}
 }
 
 // Run ...
 func (n *Notifier) Run() error {
+	defer fmt.Fprintln(n.Writer, "[block notifier] Exited")
+
 	msg := fmt.Sprint("[block notifier] Running")
 	fmt.Fprintln(n.Writer, msg)
 
+	defer func() {
+		close(n.killChan)
+		n.wg.Wait()
+	}()
+
+	n.wg.Add(1)
 	go func() {
+		defer n.wg.Done()
 		ticker := time.NewTicker(n.ClockPeriod)
 		for {
 			select {
+			case <-n.killChan:
+				return
 			case <-ticker.C:
 				n.Invoker.Invoke(0, "clock", nil)
 			case <-n.DoneChan:
@@ -81,6 +116,8 @@ func (n *Notifier) Run() error {
 
 				n.LastSlot = int(inHeight - n.StartFromBlock) // should be 0
 				n.LastHeight = inHeight
+				msg = fmt.Sprintf("[block notifier] Block corresponds to slot %d", n.LastSlot)
+				fmt.Fprintln(n.Writer, msg)
 				n.OutChan <- n.LastSlot
 			default: // We're hitting this case only after we've reached StartFromBlock
 				if inHeight <= n.LastHeight {
