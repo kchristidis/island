@@ -6,10 +6,25 @@ import (
 
 	ledger "github.com/hyperledger/fabric-sdk-go/pkg/client/ledger"
 	fab "github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
+	common "github.com/hyperledger/fabric-sdk-go/third_party/github.com/hyperledger/fabric/protos/common"
 	blocknotifier "github.com/kchristidis/exp2/blocknotifier"
 )
 
 type FakeQuerier struct {
+	QueryBlockStub        func(uint64, ...ledger.RequestOption) (*common.Block, error)
+	queryBlockMutex       sync.RWMutex
+	queryBlockArgsForCall []struct {
+		arg1 uint64
+		arg2 []ledger.RequestOption
+	}
+	queryBlockReturns struct {
+		result1 *common.Block
+		result2 error
+	}
+	queryBlockReturnsOnCall map[int]struct {
+		result1 *common.Block
+		result2 error
+	}
 	QueryInfoStub        func(...ledger.RequestOption) (*fab.BlockchainInfoResponse, error)
 	queryInfoMutex       sync.RWMutex
 	queryInfoArgsForCall []struct {
@@ -25,6 +40,70 @@ type FakeQuerier struct {
 	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
+}
+
+func (fake *FakeQuerier) QueryBlock(arg1 uint64, arg2 ...ledger.RequestOption) (*common.Block, error) {
+	fake.queryBlockMutex.Lock()
+	ret, specificReturn := fake.queryBlockReturnsOnCall[len(fake.queryBlockArgsForCall)]
+	fake.queryBlockArgsForCall = append(fake.queryBlockArgsForCall, struct {
+		arg1 uint64
+		arg2 []ledger.RequestOption
+	}{arg1, arg2})
+	fake.recordInvocation("QueryBlock", []interface{}{arg1, arg2})
+	fake.queryBlockMutex.Unlock()
+	if fake.QueryBlockStub != nil {
+		return fake.QueryBlockStub(arg1, arg2...)
+	}
+	if specificReturn {
+		return ret.result1, ret.result2
+	}
+	fakeReturns := fake.queryBlockReturns
+	return fakeReturns.result1, fakeReturns.result2
+}
+
+func (fake *FakeQuerier) QueryBlockCallCount() int {
+	fake.queryBlockMutex.RLock()
+	defer fake.queryBlockMutex.RUnlock()
+	return len(fake.queryBlockArgsForCall)
+}
+
+func (fake *FakeQuerier) QueryBlockCalls(stub func(uint64, ...ledger.RequestOption) (*common.Block, error)) {
+	fake.queryBlockMutex.Lock()
+	defer fake.queryBlockMutex.Unlock()
+	fake.QueryBlockStub = stub
+}
+
+func (fake *FakeQuerier) QueryBlockArgsForCall(i int) (uint64, []ledger.RequestOption) {
+	fake.queryBlockMutex.RLock()
+	defer fake.queryBlockMutex.RUnlock()
+	argsForCall := fake.queryBlockArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeQuerier) QueryBlockReturns(result1 *common.Block, result2 error) {
+	fake.queryBlockMutex.Lock()
+	defer fake.queryBlockMutex.Unlock()
+	fake.QueryBlockStub = nil
+	fake.queryBlockReturns = struct {
+		result1 *common.Block
+		result2 error
+	}{result1, result2}
+}
+
+func (fake *FakeQuerier) QueryBlockReturnsOnCall(i int, result1 *common.Block, result2 error) {
+	fake.queryBlockMutex.Lock()
+	defer fake.queryBlockMutex.Unlock()
+	fake.QueryBlockStub = nil
+	if fake.queryBlockReturnsOnCall == nil {
+		fake.queryBlockReturnsOnCall = make(map[int]struct {
+			result1 *common.Block
+			result2 error
+		})
+	}
+	fake.queryBlockReturnsOnCall[i] = struct {
+		result1 *common.Block
+		result2 error
+	}{result1, result2}
 }
 
 func (fake *FakeQuerier) QueryInfo(arg1 ...ledger.RequestOption) (*fab.BlockchainInfoResponse, error) {
@@ -93,6 +172,8 @@ func (fake *FakeQuerier) QueryInfoReturnsOnCall(i int, result1 *fab.BlockchainIn
 func (fake *FakeQuerier) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
+	fake.queryBlockMutex.RLock()
+	defer fake.queryBlockMutex.RUnlock()
 	fake.queryInfoMutex.RLock()
 	defer fake.queryInfoMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
