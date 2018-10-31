@@ -21,6 +21,7 @@ func TestNotifier(t *testing.T) {
 	invoker := new(blocknotifierfakes.FakeInvoker)
 	invoker.InvokeReturns(nil, nil)
 	querier := new(blocknotifierfakes.FakeQuerier)
+	querier.QueryBlockReturns(new(common.Block), nil)
 	resp := new(fab.BlockchainInfoResponse)
 	resp.BCI = new(common.BlockchainInfo)
 	outc := make(chan int)
