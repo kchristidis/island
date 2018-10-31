@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
 )
 
 // BufferLen ...
@@ -31,6 +32,9 @@ type Agent struct {
 	PrivKeyBytes []byte
 	SlotQueue    chan int // this is the agent's trigger, i.e. it's supposed to act whenever a new slot is created
 	Writer       io.Writer
+
+	wg       sync.WaitGroup
+	killChan chan struct{}
 }
 
 // New ...
@@ -44,6 +48,8 @@ func New(invoker Invoker, notifier Notifier, privKeyBytes []byte, donec chan str
 		PrivKeyBytes: privKeyBytes,
 		SlotQueue:    make(chan int, BufferLen),
 		Writer:       writer,
+
+		killChan: make(chan struct{}),
 	}
 }
 
@@ -51,6 +57,11 @@ func New(invoker Invoker, notifier Notifier, privKeyBytes []byte, donec chan str
 func (a *Agent) Run() error {
 	msg := fmt.Sprint("[markend agent] Exited")
 	defer fmt.Fprintln(a.Writer, msg)
+
+	defer func() {
+		close(a.killChan)
+		a.wg.Wait()
+	}()
 
 	if ok := a.Notifier.Register(-1, a.SlotQueue); !ok {
 		msg := fmt.Sprint("[markend agent] Unable to register with slot notifier")
@@ -61,9 +72,13 @@ func (a *Agent) Run() error {
 	msg = fmt.Sprintf("[markend agent] Registered with slot notifier")
 	fmt.Fprintln(a.Writer, msg)
 
+	a.wg.Add(1)
 	go func() {
+		defer a.wg.Done()
 		for {
 			select {
+			case <-a.killChan:
+				return
 			case slot := <-a.MarkQueue:
 				msg := fmt.Sprintf("[markend agent] Invoking 'markEnd' for slot %d", slot)
 				fmt.Fprintln(a.Writer, msg)
