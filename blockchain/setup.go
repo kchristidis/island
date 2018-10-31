@@ -145,12 +145,14 @@ func (sc *SDKContext) Install() error {
 	sc.ChannelClient = ccl
 	fmt.Fprintln(os.Stdout, "Channel client created")
 
-	ec, err := event.New(cc)
-	if err != nil {
-		return fmt.Errorf("Failed to create event client: %s", err)
+	if EnableEvents {
+		ec, err := event.New(cc)
+		if err != nil {
+			return fmt.Errorf("Failed to create event client: %s", err)
+		}
+		sc.EventClient = ec
+		fmt.Fprintln(os.Stdout, "Event client created")
 	}
-	sc.EventClient = ec
-	fmt.Fprintln(os.Stdout, "Event client created")
 
 	lc, err := ledger.New(cc)
 	if err != nil {
