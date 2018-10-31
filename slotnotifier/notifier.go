@@ -19,6 +19,7 @@ type Notifier struct {
 func New(sourcec chan int, donec chan struct{}, writer io.Writer) *Notifier {
 	return &Notifier{
 		DoneChan:   donec,
+		LastVal:    -1, // Because we want the event for slot 0 to go through
 		SourceChan: sourcec,
 		Subs:       new(sync.Map),
 		Writer:     writer,
