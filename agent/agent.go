@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"sync"
 
 	"github.com/kchristidis/exp2/crypto"
+	"github.com/kchristidis/exp2/stats"
 )
 
 // BufferLen ...
@@ -43,31 +45,38 @@ type Notifier interface {
 
 // Agent ...
 type Agent struct {
-	BuyQueue  chan int
-	DoneChan  chan struct{}
-	ID        int
-	Invoker   Invoker
-	PubKey    *rsa.PublicKey
-	SellQueue chan int
-	SlotQueue chan int // this is the agent's trigger, i.e. it's supposed to act whenever a new slot is created
-	Notifier  Notifier
-	Trace     [][]float64
-	Writer    io.Writer
+	BuyQueue     chan int
+	DoneChan     chan struct{}
+	ID           int
+	Invoker      Invoker
+	PubKey       *rsa.PublicKey
+	SellQueue    chan int
+	SlotQueue    chan int // This is the agent's trigger, i.e. it's supposed to act whenever a new slot is created
+	StatSlotChan chan stats.Slot
+	Notifier     Notifier
+	Trace        [][]float64
+	Writer       io.Writer
+
+	wg       sync.WaitGroup
+	killChan chan struct{}
 }
 
 // New ...
-func New(id int, trace [][]float64, invoker Invoker, notifier Notifier, pubkey *rsa.PublicKey, donec chan struct{}, writer io.Writer) *Agent {
+func New(id int, trace [][]float64, invoker Invoker, notifier Notifier, pubkey *rsa.PublicKey, statslotc chan stats.Slot, donec chan struct{}, writer io.Writer) *Agent {
 	return &Agent{
-		BuyQueue:  make(chan int, BufferLen),
-		DoneChan:  donec,
-		ID:        id,
-		Invoker:   invoker,
-		PubKey:    pubkey,
-		SellQueue: make(chan int, BufferLen),
-		SlotQueue: make(chan int, BufferLen),
-		Notifier:  notifier,
-		Trace:     trace[:1000], // ATTN: Temporary modification
-		Writer:    writer,
+		BuyQueue:     make(chan int, BufferLen),
+		DoneChan:     donec,
+		ID:           id,
+		Invoker:      invoker,
+		PubKey:       pubkey,
+		SellQueue:    make(chan int, BufferLen),
+		SlotQueue:    make(chan int, BufferLen),
+		StatSlotChan: statslotc,
+		Notifier:     notifier,
+		Trace:        trace[:5], // ATTN: Temporary modification
+		Writer:       writer,
+
+		killChan: make(chan struct{}),
 	}
 }
 
@@ -75,6 +84,11 @@ func New(id int, trace [][]float64, invoker Invoker, notifier Notifier, pubkey *
 func (a *Agent) Run() error {
 	msg := fmt.Sprintf("[agent %d] Exited", a.ID)
 	defer fmt.Fprintln(a.Writer, msg)
+
+	defer func() {
+		close(a.killChan)
+		a.wg.Wait()
+	}()
 
 	if ok := a.Notifier.Register(a.ID, a.SlotQueue); !ok {
 		msg := fmt.Sprintf("[agent %d] Unable to register with slot notifier", a.ID)
@@ -85,9 +99,13 @@ func (a *Agent) Run() error {
 	msg = fmt.Sprintf("[agent %d] Registered with slot notifier", a.ID)
 	fmt.Fprintln(a.Writer, msg)
 
+	a.wg.Add(1)
 	go func() {
+		defer a.wg.Done()
 		for {
 			select {
+			case <-a.killChan:
+				return
 			case rowIdx := <-a.BuyQueue:
 				a.Buy(rowIdx)
 			case <-a.DoneChan:
@@ -96,9 +114,13 @@ func (a *Agent) Run() error {
 		}
 	}()
 
+	a.wg.Add(1)
 	go func() {
+		defer a.wg.Done()
 		for {
 			select {
+			case <-a.killChan:
+				return
 			case rowIdx := <-a.SellQueue:
 				a.Sell(rowIdx)
 			case <-a.DoneChan:
@@ -154,6 +176,11 @@ func (a *Agent) Buy(rowIdx int) error {
 			fmt.Fprintln(a.Writer, msg)
 			return errors.New(msg)
 		}
+		a.StatSlotChan <- stats.Slot{
+			Number:    rowIdx,
+			EnergyUse: row[Use] * ToKWh,
+			PricePaid: row[Hi],
+		}
 		if _, err := a.Invoker.Invoke(rowIdx, "buy", encBid); err != nil {
 			msg := fmt.Sprintf("[agent %d] Unable to invoke 'buy' for row %d: %s\n", a.ID, rowIdx, err)
 			fmt.Fprintln(a.Writer, msg)
@@ -176,6 +203,11 @@ func (a *Agent) Sell(rowIdx int) error {
 			msg := fmt.Sprintf("[agent %d] Unable to encrypt 'sell' for row %d: %s\n", a.ID, rowIdx, err)
 			fmt.Fprintln(a.Writer, msg)
 			return errors.New(msg)
+		}
+		a.StatSlotChan <- stats.Slot{
+			Number:    rowIdx,
+			EnergyGen: row[Gen] * ToKWh,
+			PriceSold: row[Lo],
 		}
 		if _, err := a.Invoker.Invoke(rowIdx, "sell", encBid); err != nil {
 			msg := fmt.Sprintf("[agent %d] Unable to invoke 'sell' for row %d: %s", a.ID, rowIdx, err)

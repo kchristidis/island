@@ -9,6 +9,7 @@ import (
 	"github.com/kchristidis/exp2/agent/agentfakes"
 	"github.com/kchristidis/exp2/crypto"
 	"github.com/kchristidis/exp2/csv"
+	"github.com/kchristidis/exp2/stats"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/stretchr/testify/require"
 
@@ -31,8 +32,9 @@ func TestAgent(t *testing.T) {
 		slotnotifier := new(agentfakes.FakeNotifier)
 		donec := make(chan struct{})
 		bfr := gbytes.NewBuffer()
+		statslotc := make(chan stats.Slot, 10) // A large enough buffer so that we don't have to worry about draining it.
 
-		a := agent.New(csv.IDs[0], m[csv.IDs[0]], invoker, slotnotifier, pubkey, donec, bfr)
+		a := agent.New(csv.IDs[0], m[csv.IDs[0]], invoker, slotnotifier, pubkey, statslotc, donec, bfr)
 
 		slotnotifier.RegisterReturns(false)
 
@@ -54,10 +56,11 @@ func TestAgent(t *testing.T) {
 	t.Run("done chan closes", func(t *testing.T) {
 		invoker := new(agentfakes.FakeInvoker)
 		slotnotifier := new(agentfakes.FakeNotifier)
+		statslotc := make(chan stats.Slot, 10) // A large enough buffer so that we don't have to worry about draining it.
 		donec := make(chan struct{})
 		bfr := gbytes.NewBuffer()
 
-		a := agent.New(csv.IDs[0], m[csv.IDs[0]], invoker, slotnotifier, pubkey, donec, bfr)
+		a := agent.New(csv.IDs[0], m[csv.IDs[0]], invoker, slotnotifier, pubkey, statslotc, donec, bfr)
 
 		slotnotifier.RegisterReturns(true)
 
@@ -78,10 +81,11 @@ func TestAgent(t *testing.T) {
 	t.Run("notifier works fine", func(t *testing.T) {
 		invoker := new(agentfakes.FakeInvoker)
 		slotnotifier := new(agentfakes.FakeNotifier)
+		statslotc := make(chan stats.Slot, 10) // A large enough buffer so that we don't have to worry about draining it.
 		donec := make(chan struct{})
 		bfr := gbytes.NewBuffer()
 
-		a := agent.New(csv.IDs[0], m[csv.IDs[0]], invoker, slotnotifier, pubkey, donec, bfr)
+		a := agent.New(csv.IDs[0], m[csv.IDs[0]], invoker, slotnotifier, pubkey, statslotc, donec, bfr)
 
 		slotnotifier.RegisterReturns(true)
 

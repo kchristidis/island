@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/kchristidis/exp2/csv"
 	"github.com/kchristidis/exp2/markend"
 	"github.com/kchristidis/exp2/slotnotifier"
+	"github.com/kchristidis/exp2/stats"
 )
 
 func main() {
@@ -27,23 +29,26 @@ func main() {
 
 func run() error {
 	var (
-		err           error
-		agents        []*agent.Agent
-		bnotifier     *blocknotifier.Notifier
-		blocksperslot int
-		clockperiod   time.Duration
-		donec         chan struct{}
-		heightc       chan int
-		markendagent  *markend.Agent
-		once          sync.Once
-		privkeybytes  []byte
-		pubkey        *rsa.PublicKey
-		sdkctx        *blockchain.SDKContext
-		snotifier     *slotnotifier.Notifier
-		startblock    uint64
-		trace         map[int][][]float64
-		wg1, wg2      sync.WaitGroup
-		writer        io.Writer
+		err            error
+		agents         []*agent.Agent
+		bnotifier      *blocknotifier.Notifier
+		blocksperslot  int
+		clockperiod    time.Duration
+		donec          chan struct{}
+		heightc        chan int
+		markendagent   *markend.Agent
+		once           sync.Once
+		privkeybytes   []byte
+		pubkey         *rsa.PublicKey
+		sdkctx         *blockchain.SDKContext
+		sleepduration  time.Duration
+		snotifier      *slotnotifier.Notifier
+		startblock     uint64
+		statscollector *stats.Collector
+		statslotc      chan stats.Slot
+		trace          map[int][][]float64
+		wg1, wg2       sync.WaitGroup
+		writer         io.Writer
 	)
 
 	// Stats
@@ -56,6 +61,8 @@ func run() error {
 
 	blocksperslot = 3
 	clockperiod = 500 * time.Millisecond
+	sleepduration = 100 * time.Millisecond
+	statslotc = make(chan stats.Slot)
 	donec = make(chan struct{}) // acts as a coordination signal for goroutines
 	startblock = uint64(10)
 	writer = os.Stdout
@@ -110,6 +117,15 @@ func run() error {
 		return err
 	}
 
+	// Set up the stats collector
+
+	statscollector = &stats.Collector{
+		DoneChan: donec,
+		SlotChan: statslotc,
+		Writer:   writer,
+	}
+	go statscollector.Run()
+
 	// Set up the slot notifier
 
 	heightc = make(chan int)
@@ -129,8 +145,9 @@ func run() error {
 	}()
 
 	agents = make([]*agent.Agent, csv.IDCount)
-	for i, ID := range csv.IDs { // ATTN: Temporary modification: []int{171, 1103}
-		agents[i] = agent.New(ID, trace[ID], sdkctx, snotifier, pubkey, donec, writer)
+	// for i, ID := range []int{171, 1103} // ATTN: Temporary modification:
+	for i, ID := range csv.IDs {
+		agents[i] = agent.New(ID, trace[ID], sdkctx, snotifier, pubkey, statslotc, donec, writer)
 		wg1.Add(1)
 		go func(i int) {
 			if err = agents[i].Run(); err != nil {
@@ -144,17 +161,7 @@ func run() error {
 
 	// Set up and launch the block notifier
 
-	bnotifier = &blocknotifier.Notifier{
-		BlocksPerSlot:  blocksperslot,
-		ClockPeriod:    clockperiod,
-		DoneChan:       donec,
-		Invoker:        sdkctx,
-		OutChan:        heightc,
-		Querier:        sdkctx.LedgerClient,
-		StartFromBlock: startblock,
-		SleepDuration:  100 * time.Millisecond,
-		Writer:         writer,
-	}
+	bnotifier = blocknotifier.New(startblock, blocksperslot, clockperiod, sleepduration, sdkctx, sdkctx.LedgerClient, heightc, donec, writer)
 
 	wg2.Add(1)
 	go func() {
@@ -176,11 +183,10 @@ func run() error {
 
 	// Start the simulation
 
-	/* if resp, err := sc.Query(2, "bid"); err != nil {
-		return err
-	} else {
-		fmt.Fprintf(os.Stdout, "Response from chaincode query for '2/bid': %s\n", resp)
-	} */
+	// In the green path, the agents will run their entire trace, then exit.
+	// This will allows us to close the donec via the once.Do construct below.
+	// Then we wait for all the other goroutines to conclude.
+	// This is why we use two separate waitgroups.
 
 	wg1.Wait()
 	once.Do(func() {
@@ -188,9 +194,32 @@ func run() error {
 	})
 	wg2.Wait()
 
-	fmt.Fprintf(os.Stdout, "Run completed successfully 😎")
+	println()
+
+	fmt.Fprintln(os.Stdout, "Run completed successfully 😎")
 
 	println()
+
+	fmt.Fprintln(os.Stdout, "Time to collect & print results...")
+
+	for i := 0; i <= stats.LargestSlotSeen; i++ {
+		fmt.Fprintf(os.Stdout,
+			"[%d] %.3f kWh bought from the grid @ %.3f ç/kWh - %.3f kWh bought from the grid @ %.3f ç/kWh\n",
+			stats.SlotStats[i].Number,
+			stats.SlotStats[i].EnergyUse, stats.SlotStats[i].PricePaid,
+			stats.SlotStats[i].EnergyGen, stats.SlotStats[i].PriceSold,
+		)
+	}
+
+	/* if resp, err := sdkctx.Query(2, "bid"); err != nil {
+		return err
+	} else {
+		fmt.Fprintf(os.Stdout, "Response from chaincode query: %s\n", resp)
+	} */
+
+	println()
+
+	fmt.Fprintf(os.Stdout, "Number of goroutines still running: %d\n", runtime.NumGoroutine())
 
 	return nil
 }
