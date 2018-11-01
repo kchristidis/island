@@ -18,7 +18,7 @@ import (
 func TestNotifier(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	blockc := make(chan stats.Block)
+	blockc := make(chan stats.Block, 10) // A large enough buffer so that we don't have to worry about draining it.
 	slotc := make(chan int)
 
 	invoker := new(blocknotifierfakes.FakeInvoker)

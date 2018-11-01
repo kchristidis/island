@@ -130,11 +130,16 @@ func (n *Notifier) Run() error {
 					fmt.Fprintln(n.Writer, msg)
 					return err
 				} else {
-					_, err := proto.Marshal(block)
+					blockBytes, err := proto.Marshal(block)
 					if err != nil {
 						msg := fmt.Sprintf("[block notifier] Unable to marshal block %d: %s", n.MostRecentBlockHeight-1, err.Error())
 						fmt.Fprintln(n.Writer, msg)
 						return err
+					}
+					// For the stats collector
+					n.BlockChan <- stats.Block{
+						Number:   int(n.MostRecentBlockHeight) - 1,
+						SizeInKB: float32(len(blockBytes)) / 1024,
 					}
 					// msg := fmt.Sprintf("[block notifier] Block %d size in kiB: %d", n.MostRecentBlockHeight-1, len(blockBytes)/1024)
 					// fmt.Fprintln(n.Writer, msg)
