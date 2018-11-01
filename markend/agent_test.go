@@ -10,6 +10,7 @@ import (
 	"github.com/kchristidis/exp2/crypto"
 	"github.com/kchristidis/exp2/markend"
 	"github.com/kchristidis/exp2/markend/markendfakes"
+	"github.com/kchristidis/exp2/stats"
 	"github.com/onsi/gomega/gbytes"
 
 	. "github.com/onsi/gomega"
@@ -22,14 +23,16 @@ func TestAgent(t *testing.T) {
 	privkey, err := crypto.LoadPrivate(privkeypath)
 	require.NoError(t, err)
 	privkeybytes := crypto.SerializePrivate(privkey)
+	transactionc := make(chan stats.Transaction, 10) // A large enough buffer so that we don't have to worry about draining it.
 
 	t.Run("notifier registration fails", func(t *testing.T) {
 		invoker := new(markendfakes.FakeInvoker)
 		slotnotifier := new(markendfakes.FakeNotifier)
-		donec := make(chan struct{})
-		bfr := gbytes.NewBuffer()
 
-		m := markend.New(invoker, slotnotifier, privkeybytes, donec, bfr)
+		bfr := gbytes.NewBuffer()
+		donec := make(chan struct{})
+
+		m := markend.New(invoker, slotnotifier, privkeybytes, transactionc, bfr, donec)
 
 		slotnotifier.RegisterReturns(false)
 
@@ -51,10 +54,12 @@ func TestAgent(t *testing.T) {
 	t.Run("done chan closes", func(t *testing.T) {
 		invoker := new(markendfakes.FakeInvoker)
 		slotnotifier := new(markendfakes.FakeNotifier)
-		donec := make(chan struct{})
-		bfr := gbytes.NewBuffer()
+		transactionc := make(chan stats.Transaction, 10) // A large enough buffer so that we don't have to worry about draining it.
 
-		m := markend.New(invoker, slotnotifier, privkeybytes, donec, bfr)
+		bfr := gbytes.NewBuffer()
+		donec := make(chan struct{})
+
+		m := markend.New(invoker, slotnotifier, privkeybytes, transactionc, bfr, donec)
 
 		slotnotifier.RegisterReturns(true)
 
@@ -75,10 +80,11 @@ func TestAgent(t *testing.T) {
 	t.Run("notifier works fine", func(t *testing.T) {
 		invoker := new(markendfakes.FakeInvoker)
 		slotnotifier := new(markendfakes.FakeNotifier)
-		donec := make(chan struct{})
-		bfr := gbytes.NewBuffer()
 
-		m := markend.New(invoker, slotnotifier, privkeybytes, donec, bfr)
+		bfr := gbytes.NewBuffer()
+		donec := make(chan struct{})
+
+		m := markend.New(invoker, slotnotifier, privkeybytes, transactionc, bfr, donec)
 
 		slotnotifier.RegisterReturns(true)
 
@@ -103,10 +109,11 @@ func TestAgent(t *testing.T) {
 	t.Run("invocation fails", func(t *testing.T) {
 		invoker := new(markendfakes.FakeInvoker)
 		slotnotifier := new(markendfakes.FakeNotifier)
-		donec := make(chan struct{})
-		bfr := gbytes.NewBuffer()
 
-		m := markend.New(invoker, slotnotifier, privkeybytes, donec, bfr)
+		bfr := gbytes.NewBuffer()
+		donec := make(chan struct{})
+
+		m := markend.New(invoker, slotnotifier, privkeybytes, transactionc, bfr, donec)
 
 		slotnotifier.RegisterReturns(true)
 
@@ -130,10 +137,11 @@ func TestAgent(t *testing.T) {
 	t.Run("invocation fails", func(t *testing.T) {
 		invoker := new(markendfakes.FakeInvoker)
 		slotnotifier := new(markendfakes.FakeNotifier)
-		donec := make(chan struct{})
-		bfr := gbytes.NewBuffer()
 
-		m := markend.New(invoker, slotnotifier, privkeybytes, donec, bfr)
+		bfr := gbytes.NewBuffer()
+		donec := make(chan struct{})
+
+		m := markend.New(invoker, slotnotifier, privkeybytes, transactionc, bfr, donec)
 
 		slotnotifier.RegisterReturns(true)
 

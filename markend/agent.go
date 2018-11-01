@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"sync"
+
+	"github.com/kchristidis/exp2/stats"
 )
 
 // BufferLen ...
@@ -24,32 +26,45 @@ type Notifier interface {
 
 // Agent ...
 type Agent struct {
-	DoneChan     chan struct{}
-	ErrChan      chan error
-	Invoker      Invoker
-	MarkQueue    chan int
-	Notifier     Notifier
-	PrivKeyBytes []byte
-	SlotQueue    chan int // this is the agent's trigger, i.e. it's supposed to act whenever a new slot is created
-	Writer       io.Writer
+	Invoker  Invoker
+	Notifier Notifier
 
-	wg       sync.WaitGroup
-	killChan chan struct{}
+	PrivKeyBytes []byte
+
+	TransactionChan chan stats.Transaction // Used to feed the stats collector.
+
+	SlotQueue chan int   // The agent's trigger/input — an agent acts whenever a new slot is pushed through this channel.
+	MarkQueue chan int   // A slot notification from SlotQueue ends up here, and is then picked up by a goroutine.
+	ErrChan   chan error // Used internally between the spawned goroutine and the main thread in this package for the return of errors.
+
+	Writer io.Writer
+
+	DoneChan  chan struct{}   // An external kill switch. Signals to all threads in this package that they should return.
+	killChan  chan struct{}   // An internal kill switch. It can only be closed by this package, and it signals to the package's goroutines that they should exit.
+	waitGroup *sync.WaitGroup // Ensures that the main thread in this package doesn't return before the goroutines it spawned also have as well.
 }
 
 // New ...
-func New(invoker Invoker, notifier Notifier, privKeyBytes []byte, donec chan struct{}, writer io.Writer) *Agent {
+func New(
+	invoker Invoker, slotnotifier Notifier,
+	privKeyBytes []byte, transactionc chan stats.Transaction,
+	writer io.Writer, donec chan struct{}) *Agent {
 	return &Agent{
-		DoneChan:     donec,
-		ErrChan:      make(chan error),
-		Invoker:      invoker,
-		MarkQueue:    make(chan int, BufferLen),
-		Notifier:     notifier,
-		PrivKeyBytes: privKeyBytes,
-		SlotQueue:    make(chan int, BufferLen),
-		Writer:       writer,
+		Invoker:  invoker,
+		Notifier: slotnotifier,
 
-		killChan: make(chan struct{}),
+		PrivKeyBytes:    privKeyBytes,
+		TransactionChan: transactionc,
+
+		SlotQueue: make(chan int, BufferLen),
+		MarkQueue: make(chan int, BufferLen),
+		ErrChan:   make(chan error),
+
+		Writer: writer,
+
+		DoneChan:  donec,
+		killChan:  make(chan struct{}),
+		waitGroup: new(sync.WaitGroup),
 	}
 }
 
@@ -60,7 +75,7 @@ func (a *Agent) Run() error {
 
 	defer func() {
 		close(a.killChan)
-		a.wg.Wait()
+		a.waitGroup.Wait()
 	}()
 
 	if ok := a.Notifier.Register(-1, a.SlotQueue); !ok {
@@ -72,9 +87,9 @@ func (a *Agent) Run() error {
 	msg = fmt.Sprintf("[markend agent] Registered with slot notifier")
 	fmt.Fprintln(a.Writer, msg)
 
-	a.wg.Add(1)
+	a.waitGroup.Add(1)
 	go func() {
-		defer a.wg.Done()
+		defer a.waitGroup.Done()
 		for {
 			select {
 			case <-a.killChan:
@@ -113,7 +128,7 @@ func (a *Agent) Run() error {
 				return errors.New(msg)
 			}
 		case <-a.DoneChan:
-			select { // cover the edge case in tests where you close the donechan to conclude the test, and this branch is selected over the top-level errchan one
+			select { // Cover the edge case in tests where you close the DoneChan to conclude the test, and this branch is selected over the top-level ErrChan one
 			case err := <-a.ErrChan:
 				return err
 			default:
