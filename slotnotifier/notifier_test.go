@@ -13,9 +13,11 @@ func TestNotifier(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	sourcec := make(chan int)
-	donec := make(chan struct{})
 	bfr := gbytes.NewBuffer()
-	n := New(sourcec, donec, bfr)
+	donec := make(chan struct{})
+
+	n := New(sourcec, bfr, donec)
+
 	go n.Run()
 
 	t.Run("register", func(t *testing.T) {
@@ -52,6 +54,6 @@ func TestNotifier(t *testing.T) {
 		close(donec)
 
 		// Signal closes properly
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Slot notifier exited"))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Exited"))
 	})
 }

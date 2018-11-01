@@ -8,21 +8,26 @@ import (
 
 // Notifier ...
 type Notifier struct {
-	DoneChan   <-chan struct{}
-	LastVal    int
 	SourceChan <-chan int
-	Subs       *sync.Map
-	Writer     io.Writer
+
+	Subs    *sync.Map
+	LastVal int
+
+	Writer   io.Writer
+	DoneChan <-chan struct{}
 }
 
 // New ...
-func New(sourcec chan int, donec chan struct{}, writer io.Writer) *Notifier {
+func New(sourcec chan int, writer io.Writer, donec chan struct{}) *Notifier {
 	return &Notifier{
-		DoneChan:   donec,
-		LastVal:    -1, // Because we want the event for slot 0 to go through
-		SourceChan: sourcec,
-		Subs:       new(sync.Map),
-		Writer:     writer,
+		SourceChan: sourcec, // The channel on which slot notifications are received from the block notifier.
+
+		Subs:    new(sync.Map),
+		LastVal: -1, // -1 because we want the event for slot 0 to go through.
+
+		Writer: writer, // Used for logging.
+
+		DoneChan: donec, // An external kill switch. Signals to all threads in this package that they should return.
 	}
 }
 
