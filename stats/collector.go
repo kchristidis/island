@@ -22,7 +22,7 @@ type Slot struct {
 	PriceSold float64
 }
 
-//
+// SlotStats ...
 var (
 	SlotStats       [TraceLength]Slot
 	LargestSlotSeen int
@@ -30,19 +30,33 @@ var (
 
 // Block ...
 type Block struct {
-	Number int
-	Size   int
+	Number   int
+	SizeInKB float32
 }
 
 // BlockStats ...
 var BlockStats []Block
 
+// Transaction ...
+type Transaction struct {
+	ID              string
+	Type            string
+	Status          string
+	LatencyInMillis int
+}
+
+// TransactionStats ...
+var TransactionStats []Transaction
+
 // Collector ...
 type Collector struct {
-	BlockChan chan Block    // Input
-	DoneChan  chan struct{} // Input
-	SlotChan  chan Slot     // Input
-	Writer    io.Writer
+	BlockChan       chan Block // Input channels for stat aggregation.
+	SlotChan        chan Slot
+	TransactionChan chan Transaction
+
+	Writer io.Writer // Used for logging.
+
+	DoneChan chan struct{} // An external kill switch.
 }
 
 // Run ...
@@ -51,9 +65,17 @@ func (c *Collector) Run() {
 
 	for {
 		select {
+		case newLine := <-c.TransactionChan:
+			c.TransactionCalc(newLine, &TransactionStats)
+		case newLine := <-c.BlockChan:
+			c.BlockCalc(newLine, &BlockStats)
 		case newLine := <-c.SlotChan:
 			c.SlotCalc(newLine, &SlotStats)
 		case <-c.DoneChan:
+			close(c.BlockChan)
+			for newLine := range c.BlockChan {
+				c.BlockCalc(newLine, &BlockStats)
+			}
 			close(c.SlotChan)
 			// Don't exit until you make sure that the slot chan is drained first
 			for newLine := range c.SlotChan {
@@ -64,11 +86,18 @@ func (c *Collector) Run() {
 	}
 }
 
+// TransactionCalc ...
+func (c *Collector) TransactionCalc(newLine Transaction, aggStats *[]Transaction) {
+	*aggStats = append(*aggStats, newLine)
+}
+
+// BlockCalc ...
+func (c *Collector) BlockCalc(newLine Block, aggStats *[]Block) {
+	*aggStats = append(*aggStats, newLine)
+}
+
 // SlotCalc ...
 func (c *Collector) SlotCalc(newLine Slot, aggStats *[TraceLength]Slot) {
-	/* msg := fmt.Sprintf(">>> About to consider slot %d: %.3f kWh used @ %.3f ç/kWh, %.3f kWh sold @ %.3f ç/kWh",
-		newLine.Number, newLine.EnergyUse, newLine.PricePaid, newLine.EnergyGen, newLine.PriceSold)
-	fmt.Fprintln(c.Writer, msg) */
 	slotNum := newLine.Number
 	if slotNum > LargestSlotSeen {
 		LargestSlotSeen = slotNum
@@ -81,6 +110,4 @@ func (c *Collector) SlotCalc(newLine Slot, aggStats *[TraceLength]Slot) {
 		curLine.EnergyGen += newLine.EnergyGen
 		(*aggStats)[slotNum] = curLine
 	}
-	/* msg = fmt.Sprintf(">>> At the end of this Calc run, the aggregate stats for slot %d look like this: %v", slotNum, SlotStats[slotNum])
-	fmt.Fprintln(c.Writer, msg) */
 }
