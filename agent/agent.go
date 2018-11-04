@@ -69,7 +69,7 @@ type Agent struct {
 // New ...
 func New(invoker Invoker, notifier Notifier,
 	pubkey *rsa.PublicKey, trace [][]float64, id int,
-	transactionc chan stats.Transaction, slotc chan stats.Slot,
+	slotc chan stats.Slot, transactionc chan stats.Transaction,
 	writer io.Writer, donec chan struct{}) *Agent {
 	return &Agent{
 		Invoker:  invoker,

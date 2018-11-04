@@ -37,7 +37,7 @@ func TestAgent(t *testing.T) {
 		bfr := gbytes.NewBuffer()
 		donec := make(chan struct{})
 
-		a := agent.New(invoker, slotnotifier, pubkey, m[csv.IDs[0]], csv.IDs[0], transactionc, slotc, bfr, donec)
+		a := agent.New(invoker, slotnotifier, pubkey, m[csv.IDs[0]], csv.IDs[0], slotc, transactionc, bfr, donec)
 
 		slotnotifier.RegisterReturns(false)
 
@@ -63,7 +63,7 @@ func TestAgent(t *testing.T) {
 		bfr := gbytes.NewBuffer()
 		donec := make(chan struct{})
 
-		a := agent.New(invoker, slotnotifier, pubkey, m[csv.IDs[0]], csv.IDs[0], transactionc, slotc, bfr, donec)
+		a := agent.New(invoker, slotnotifier, pubkey, m[csv.IDs[0]], csv.IDs[0], slotc, transactionc, bfr, donec)
 
 		slotnotifier.RegisterReturns(true)
 
@@ -88,7 +88,7 @@ func TestAgent(t *testing.T) {
 		bfr := gbytes.NewBuffer()
 		donec := make(chan struct{})
 
-		a := agent.New(invoker, slotnotifier, pubkey, m[csv.IDs[0]], csv.IDs[0], transactionc, slotc, bfr, donec)
+		a := agent.New(invoker, slotnotifier, pubkey, m[csv.IDs[0]], csv.IDs[0], slotc, transactionc, bfr, donec)
 
 		slotnotifier.RegisterReturns(true)
 
