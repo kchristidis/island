@@ -45,38 +45,52 @@ type Notifier interface {
 
 // Agent ...
 type Agent struct {
-	BuyQueue     chan int
-	DoneChan     chan struct{}
-	ID           int
-	Invoker      Invoker
-	PubKey       *rsa.PublicKey
-	SellQueue    chan int
-	SlotQueue    chan int // This is the agent's trigger, i.e. it's supposed to act whenever a new slot is created
-	StatSlotChan chan stats.Slot
-	Notifier     Notifier
-	Trace        [][]float64
-	Writer       io.Writer
+	Invoker  Invoker
+	Notifier Notifier
 
-	wg       sync.WaitGroup
-	killChan chan struct{}
+	PubKey *rsa.PublicKey
+	Trace  [][]float64
+	ID     int
+
+	SlotChan        chan stats.Slot        // Used to feed the stats collector.
+	TransactionChan chan stats.Transaction // Used to feed the stats collector.
+
+	SlotQueue chan int // The agent's trigger/input — an agent acts whenever a new slot is pushed through this channel.
+	BuyQueue  chan int // Used to decouple bids from the main thread.
+	SellQueue chan int // As above.
+
+	Writer io.Writer // For logging.
+
+	DoneChan  chan struct{}   // An external kill switch. Signals to all threads in this package that they should return.
+	killChan  chan struct{}   // An internal kill switch. It can only be closed by this package, and it signals to the package's goroutines that they should exit.
+	waitGroup *sync.WaitGroup // Ensures that the main thread in this package doesn't return before the goroutines it spawned also have as well.
 }
 
 // New ...
-func New(id int, trace [][]float64, invoker Invoker, notifier Notifier, pubkey *rsa.PublicKey, statslotc chan stats.Slot, donec chan struct{}, writer io.Writer) *Agent {
+func New(invoker Invoker, notifier Notifier,
+	pubkey *rsa.PublicKey, trace [][]float64, id int,
+	transactionc chan stats.Transaction, slotc chan stats.Slot,
+	writer io.Writer, donec chan struct{}) *Agent {
 	return &Agent{
-		BuyQueue:     make(chan int, BufferLen),
-		DoneChan:     donec,
-		ID:           id,
-		Invoker:      invoker,
-		PubKey:       pubkey,
-		SellQueue:    make(chan int, BufferLen),
-		SlotQueue:    make(chan int, BufferLen),
-		StatSlotChan: statslotc,
-		Notifier:     notifier,
-		Trace:        trace[:5], // ATTN: Temporary modification
-		Writer:       writer,
+		Invoker:  invoker,
+		Notifier: notifier,
 
-		killChan: make(chan struct{}),
+		PubKey: pubkey,
+		Trace:  trace[:5], // ATTN: Temporary modification
+		ID:     id,
+
+		SlotChan:        slotc,
+		TransactionChan: transactionc,
+
+		SlotQueue: make(chan int, BufferLen),
+		BuyQueue:  make(chan int, BufferLen),
+		SellQueue: make(chan int, BufferLen),
+
+		Writer: writer,
+
+		DoneChan:  donec,
+		killChan:  make(chan struct{}),
+		waitGroup: new(sync.WaitGroup),
 	}
 }
 
@@ -87,7 +101,7 @@ func (a *Agent) Run() error {
 
 	defer func() {
 		close(a.killChan)
-		a.wg.Wait()
+		a.waitGroup.Wait()
 	}()
 
 	if ok := a.Notifier.Register(a.ID, a.SlotQueue); !ok {
@@ -99,9 +113,9 @@ func (a *Agent) Run() error {
 	msg = fmt.Sprintf("[agent %d] Registered with slot notifier", a.ID)
 	fmt.Fprintln(a.Writer, msg)
 
-	a.wg.Add(1)
+	a.waitGroup.Add(1)
 	go func() {
-		defer a.wg.Done()
+		defer a.waitGroup.Done()
 		for {
 			select {
 			case <-a.killChan:
@@ -114,9 +128,9 @@ func (a *Agent) Run() error {
 		}
 	}()
 
-	a.wg.Add(1)
+	a.waitGroup.Add(1)
 	go func() {
-		defer a.wg.Done()
+		defer a.waitGroup.Done()
 		for {
 			select {
 			case <-a.killChan:
@@ -176,7 +190,7 @@ func (a *Agent) Buy(rowIdx int) error {
 			fmt.Fprintln(a.Writer, msg)
 			return errors.New(msg)
 		}
-		a.StatSlotChan <- stats.Slot{
+		a.SlotChan <- stats.Slot{
 			Number:    rowIdx,
 			EnergyUse: row[Use] * ToKWh,
 			PricePaid: row[Hi],
@@ -204,7 +218,7 @@ func (a *Agent) Sell(rowIdx int) error {
 			fmt.Fprintln(a.Writer, msg)
 			return errors.New(msg)
 		}
-		a.StatSlotChan <- stats.Slot{
+		a.SlotChan <- stats.Slot{
 			Number:    rowIdx,
 			EnergyGen: row[Gen] * ToKWh,
 			PriceSold: row[Lo],

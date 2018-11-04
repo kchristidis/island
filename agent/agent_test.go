@@ -27,14 +27,17 @@ func TestAgent(t *testing.T) {
 	pubkey, err := crypto.LoadPublic(pubkeypath)
 	require.NoError(t, err)
 
+	slotc := make(chan stats.Slot, 10)               // A large enough buffer so that we don't have to worry about draining it.
+	transactionc := make(chan stats.Transaction, 10) // A large enough buffer so that we don't have to worry about draining it.
+
 	t.Run("notifier registration fails", func(t *testing.T) {
 		invoker := new(agentfakes.FakeInvoker)
 		slotnotifier := new(agentfakes.FakeNotifier)
-		donec := make(chan struct{})
-		bfr := gbytes.NewBuffer()
-		statslotc := make(chan stats.Slot, 10) // A large enough buffer so that we don't have to worry about draining it.
 
-		a := agent.New(csv.IDs[0], m[csv.IDs[0]], invoker, slotnotifier, pubkey, statslotc, donec, bfr)
+		bfr := gbytes.NewBuffer()
+		donec := make(chan struct{})
+
+		a := agent.New(invoker, slotnotifier, pubkey, m[csv.IDs[0]], csv.IDs[0], transactionc, slotc, bfr, donec)
 
 		slotnotifier.RegisterReturns(false)
 
@@ -56,11 +59,11 @@ func TestAgent(t *testing.T) {
 	t.Run("done chan closes", func(t *testing.T) {
 		invoker := new(agentfakes.FakeInvoker)
 		slotnotifier := new(agentfakes.FakeNotifier)
-		statslotc := make(chan stats.Slot, 10) // A large enough buffer so that we don't have to worry about draining it.
-		donec := make(chan struct{})
-		bfr := gbytes.NewBuffer()
 
-		a := agent.New(csv.IDs[0], m[csv.IDs[0]], invoker, slotnotifier, pubkey, statslotc, donec, bfr)
+		bfr := gbytes.NewBuffer()
+		donec := make(chan struct{})
+
+		a := agent.New(invoker, slotnotifier, pubkey, m[csv.IDs[0]], csv.IDs[0], transactionc, slotc, bfr, donec)
 
 		slotnotifier.RegisterReturns(true)
 
@@ -81,11 +84,11 @@ func TestAgent(t *testing.T) {
 	t.Run("notifier works fine", func(t *testing.T) {
 		invoker := new(agentfakes.FakeInvoker)
 		slotnotifier := new(agentfakes.FakeNotifier)
-		statslotc := make(chan stats.Slot, 10) // A large enough buffer so that we don't have to worry about draining it.
-		donec := make(chan struct{})
-		bfr := gbytes.NewBuffer()
 
-		a := agent.New(csv.IDs[0], m[csv.IDs[0]], invoker, slotnotifier, pubkey, statslotc, donec, bfr)
+		bfr := gbytes.NewBuffer()
+		donec := make(chan struct{})
+
+		a := agent.New(invoker, slotnotifier, pubkey, m[csv.IDs[0]], csv.IDs[0], transactionc, slotc, bfr, donec)
 
 		slotnotifier.RegisterReturns(true)
 
