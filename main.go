@@ -20,6 +20,9 @@ import (
 	"github.com/kchristidis/exp2/stats"
 )
 
+// StatChannelBuffer ...
+const StatChannelBuffer = 100
+
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
@@ -29,26 +32,35 @@ func main() {
 
 func run() error {
 	var (
-		err            error
-		agents         []*agent.Agent
-		bnotifier      *blocknotifier.Notifier
+		err error
+
+		agents       []*agent.Agent
+		markendagent *markend.Agent
+		bnotifier    *blocknotifier.Notifier
+		snotifier    *slotnotifier.Notifier
+		sdkctx       *blockchain.SDKContext
+
 		blocksperslot  int
 		clockperiod    time.Duration
-		donec          chan struct{}
-		heightc        chan int
-		markendagent   *markend.Agent
-		once           sync.Once
-		privkeybytes   []byte
-		pubkey         *rsa.PublicKey
-		sdkctx         *blockchain.SDKContext
 		sleepduration  time.Duration
-		snotifier      *slotnotifier.Notifier
-		startblock     uint64
-		statscollector *stats.Collector
+		startfromblock uint64
+
+		privkeybytes []byte
+		pubkey       *rsa.PublicKey
+		trace        map[int][][]float64
+
+		slotc chan int
+
+		statsblockc    chan stats.Block
 		statslotc      chan stats.Slot
-		trace          map[int][][]float64
-		wg1, wg2       sync.WaitGroup
-		writer         io.Writer
+		statstranc     chan stats.Transaction
+		statscollector *stats.Collector
+
+		donec    chan struct{}
+		once     sync.Once
+		wg1, wg2 sync.WaitGroup
+
+		writer io.Writer
 	)
 
 	// Stats
@@ -62,9 +74,14 @@ func run() error {
 	blocksperslot = 3
 	clockperiod = 500 * time.Millisecond
 	sleepduration = 100 * time.Millisecond
-	statslotc = make(chan stats.Slot)
-	donec = make(chan struct{}) // acts as a coordination signal for goroutines
-	startblock = uint64(10)
+	startfromblock = uint64(10)
+
+	statsblockc = make(chan stats.Block, StatChannelBuffer)
+	statslotc = make(chan stats.Slot, StatChannelBuffer)
+	statstranc = make(chan stats.Transaction, StatChannelBuffer)
+
+	donec = make(chan struct{}) // Acts as a coordination signal for goroutines.
+
 	writer = os.Stdout
 
 	// Load the trace
@@ -120,20 +137,22 @@ func run() error {
 	// Set up the stats collector
 
 	statscollector = &stats.Collector{
-		DoneChan: donec,
-		SlotChan: statslotc,
-		Writer:   writer,
+		BlockChan:       statsblockc,
+		SlotChan:        statslotc,
+		TransactionChan: statstranc,
+		Writer:          writer,
+		DoneChan:        donec,
 	}
 	go statscollector.Run()
 
 	// Set up the slot notifier
 
-	heightc = make(chan int)
-	snotifier = slotnotifier.New(heightc, donec, writer)
+	slotc = make(chan int)
+	snotifier = slotnotifier.New(slotc, writer, donec)
 
 	// Set up and launch the agents
 
-	markendagent = markend.New(sdkctx, snotifier, privkeybytes, donec, writer)
+	markendagent = markend.New(sdkctx, snotifier, privkeybytes, statstranc, writer, donec)
 	wg2.Add(1)
 	go func() {
 		if err := markendagent.Run(); err != nil {
@@ -147,7 +166,7 @@ func run() error {
 	agents = make([]*agent.Agent, csv.IDCount)
 	// for i, ID := range []int{171, 1103} // ATTN: Temporary modification:
 	for i, ID := range csv.IDs {
-		agents[i] = agent.New(ID, trace[ID], sdkctx, snotifier, pubkey, statslotc, donec, writer)
+		agents[i] = agent.New(sdkctx, snotifier, pubkey, trace[ID], ID, statslotc, statstranc, writer, donec)
 		wg1.Add(1)
 		go func(i int) {
 			if err = agents[i].Run(); err != nil {
@@ -161,7 +180,12 @@ func run() error {
 
 	// Set up and launch the block notifier
 
-	bnotifier = blocknotifier.New(startblock, blocksperslot, clockperiod, sleepduration, sdkctx, sdkctx.LedgerClient, heightc, donec, writer)
+	bnotifier = blocknotifier.New(
+		blocksperslot, clockperiod, sleepduration, startfromblock,
+		statsblockc, slotc,
+		sdkctx, sdkctx.LedgerClient,
+		writer, donec,
+	)
 
 	wg2.Add(1)
 	go func() {
@@ -202,9 +226,21 @@ func run() error {
 
 	fmt.Fprintln(os.Stdout, "Time to collect & print results...")
 
+	println()
+
+	for _, b := range stats.BlockStats {
+		fmt.Fprintf(writer,
+			"[block: %d] %f kiB\n",
+			b.Number,
+			b.SizeInKB,
+		)
+	}
+
+	println()
+
 	for i := 0; i <= stats.LargestSlotSeen; i++ {
-		fmt.Fprintf(os.Stdout,
-			"[%d] %.3f kWh bought from the grid @ %.3f ç/kWh - %.3f kWh bought from the grid @ %.3f ç/kWh\n",
+		fmt.Fprintf(writer,
+			"[slot: %d] up to %.3f kWh bought from the grid @ %.3f ç/kWh - up to %.3f kWh sold to grid @ %.3f ç/kWh\n",
 			stats.SlotStats[i].Number,
 			stats.SlotStats[i].EnergyUse, stats.SlotStats[i].PricePaid,
 			stats.SlotStats[i].EnergyGen, stats.SlotStats[i].PriceSold,
