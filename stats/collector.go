@@ -72,6 +72,10 @@ func (c *Collector) Run() {
 		case newLine := <-c.SlotChan:
 			c.SlotCalc(newLine, &SlotStats)
 		case <-c.DoneChan:
+			close(c.TransactionChan)
+			for newLine := range c.TransactionChan {
+				c.TransactionCalc(newLine, &TransactionStats)
+			}
 			close(c.BlockChan)
 			for newLine := range c.BlockChan {
 				c.BlockCalc(newLine, &BlockStats)
@@ -108,6 +112,15 @@ func (c *Collector) SlotCalc(newLine Slot, aggStats *[TraceLength]Slot) {
 		curLine := aggStats[slotNum]
 		curLine.EnergyUse += newLine.EnergyUse
 		curLine.EnergyGen += newLine.EnergyGen
+
+		if curLine.PricePaid < newLine.PricePaid {
+			curLine.PricePaid = newLine.PricePaid
+		}
+
+		if curLine.PriceSold < newLine.PriceSold {
+			curLine.PriceSold = newLine.PriceSold
+		}
+
 		(*aggStats)[slotNum] = curLine
 	}
 }
