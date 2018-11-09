@@ -56,9 +56,9 @@ func run() error {
 		statstranc     chan stats.Transaction
 		statscollector *stats.Collector
 
-		donec    chan struct{}
-		once     sync.Once
-		wg1, wg2 sync.WaitGroup
+		donec, donestatsc chan struct{}
+		once              sync.Once
+		wg1, wg2, wg3     sync.WaitGroup
 
 		writer io.Writer
 	)
@@ -80,7 +80,8 @@ func run() error {
 	statslotc = make(chan stats.Slot, StatChannelBuffer)
 	statstranc = make(chan stats.Transaction, StatChannelBuffer)
 
-	donec = make(chan struct{}) // Acts as a coordination signal for goroutines.
+	donec = make(chan struct{})      // Acts as a coordination signal for goroutines.
+	donestatsc = make(chan struct{}) // We want to kill the stats collector *after* all the stats submitting goroutines have returned.
 
 	writer = os.Stdout
 
@@ -141,9 +142,13 @@ func run() error {
 		SlotChan:        statslotc,
 		TransactionChan: statstranc,
 		Writer:          writer,
-		DoneChan:        donec,
+		DoneChan:        donestatsc,
 	}
-	go statscollector.Run()
+	wg3.Add(1)
+	go func() {
+		statscollector.Run()
+		wg3.Done()
+	}()
 
 	// Set up the slot notifier
 
@@ -212,19 +217,26 @@ func run() error {
 	// Then we wait for all the other goroutines to conclude.
 	// This is why we use two separate waitgroups.
 
+	println()
+
 	wg1.Wait()
 	once.Do(func() {
+		fmt.Fprintln(os.Stdout, "Closing donec...")
 		close(donec)
 	})
 	wg2.Wait()
-
-	println()
 
 	fmt.Fprintln(os.Stdout, "Run completed successfully 😎")
 
 	println()
 
 	fmt.Fprintln(os.Stdout, "Time to collect & print results...")
+
+	println()
+
+	fmt.Fprintln(os.Stdout, "Closing donestatsc...")
+	close(donestatsc)
+	wg3.Wait()
 
 	println()
 
@@ -244,6 +256,18 @@ func run() error {
 			stats.SlotStats[i].Number,
 			stats.SlotStats[i].EnergyUse, stats.SlotStats[i].PricePaid,
 			stats.SlotStats[i].EnergyGen, stats.SlotStats[i].PriceSold,
+		)
+	}
+
+	println()
+
+	for _, tx := range stats.TransactionStats {
+		fmt.Fprintf(writer,
+			"[txID: %s]\tlatency:%d ms\t\ttype:%s\tstatus:%s\n",
+			tx.ID,
+			tx.LatencyInMillis,
+			tx.Type,
+			tx.Status,
 		)
 	}
 
