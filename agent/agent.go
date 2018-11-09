@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"strconv"
 	"sync"
+	"time"
 
 	"github.com/kchristidis/exp2/crypto"
 	"github.com/kchristidis/exp2/stats"
@@ -34,7 +36,7 @@ const (
 // Invoker ...
 //go:generate counterfeiter . Invoker
 type Invoker interface {
-	Invoke(slot int, action string, dataB []byte) ([]byte, error)
+	Invoke(txID string, slot int, action string, dataB []byte) ([]byte, error)
 }
 
 // Notifier ...
@@ -179,6 +181,7 @@ func (a *Agent) Run() error {
 // Buy ...
 func (a *Agent) Buy(rowIdx int) error {
 	row := a.Trace[rowIdx]
+	txID := strconv.Itoa(rand.Intn(1E6))
 	if row[Use] > 0 {
 		ppu := row[Lo] + (row[Hi]-row[Lo])*(1.0-rand.Float64())
 		bid, _ := json.Marshal([]float64{ppu, row[Use] * ToKWh}) // first arg: PPU, second arg: QTY
@@ -195,10 +198,29 @@ func (a *Agent) Buy(rowIdx int) error {
 			EnergyUse: row[Use] * ToKWh,
 			PricePaid: row[Hi],
 		}
-		if _, err := a.Invoker.Invoke(rowIdx, "buy", encBid); err != nil {
+		timeStart := time.Now()
+		if _, err := a.Invoker.Invoke(txID, rowIdx, "buy", encBid); err != nil {
 			msg := fmt.Sprintf("[agent %d] Unable to invoke 'buy' for row %d: %s\n", a.ID, rowIdx, err)
 			fmt.Fprintln(a.Writer, msg)
+			// Update stats
+			timeEnd := time.Now()
+			elapsed := int64(timeEnd.Sub(timeStart) / time.Millisecond)
+			a.TransactionChan <- stats.Transaction{
+				ID:              txID,
+				Type:            "buy",
+				Status:          err.Error(),
+				LatencyInMillis: elapsed,
+			}
 			return errors.New(msg)
+		}
+		// Update stats
+		timeEnd := time.Now()
+		elapsed := int64(timeEnd.Sub(timeStart) / time.Millisecond)
+		a.TransactionChan <- stats.Transaction{
+			ID:              txID,
+			Type:            "buy",
+			Status:          "success",
+			LatencyInMillis: elapsed,
 		}
 	}
 	return nil
@@ -206,6 +228,7 @@ func (a *Agent) Buy(rowIdx int) error {
 
 // Sell ...
 func (a *Agent) Sell(rowIdx int) error {
+	txID := strconv.Itoa(rand.Intn(1E6))
 	row := a.Trace[rowIdx]
 	if row[Gen] > 0 {
 		ppu := row[Lo] + (row[Hi]-row[Lo])*(1.0-rand.Float64())
@@ -223,10 +246,29 @@ func (a *Agent) Sell(rowIdx int) error {
 			EnergyGen: row[Gen] * ToKWh,
 			PriceSold: row[Lo],
 		}
-		if _, err := a.Invoker.Invoke(rowIdx, "sell", encBid); err != nil {
+		timeStart := time.Now()
+		if _, err := a.Invoker.Invoke(txID, rowIdx, "sell", encBid); err != nil {
 			msg := fmt.Sprintf("[agent %d] Unable to invoke 'sell' for row %d: %s", a.ID, rowIdx, err)
 			fmt.Fprintln(a.Writer, msg)
+			// Update stats
+			timeEnd := time.Now()
+			elapsed := int64(timeEnd.Sub(timeStart) / time.Millisecond)
+			a.TransactionChan <- stats.Transaction{
+				ID:              txID,
+				Type:            "buy",
+				Status:          err.Error(),
+				LatencyInMillis: elapsed,
+			}
 			return errors.New(msg)
+		}
+		// Update stats
+		timeEnd := time.Now()
+		elapsed := int64(timeEnd.Sub(timeStart) / time.Millisecond)
+		a.TransactionChan <- stats.Transaction{
+			ID:              txID,
+			Type:            "buy",
+			Status:          "success",
+			LatencyInMillis: elapsed,
 		}
 	}
 	return nil
