@@ -3,6 +3,8 @@ package blocknotifier
 import (
 	"fmt"
 	"io"
+	"math/rand"
+	"strconv"
 	"sync"
 	"time"
 
@@ -16,7 +18,7 @@ import (
 // Invoker ...
 //go:generate counterfeiter . Invoker
 type Invoker interface {
-	Invoke(slot int, action string, dataB []byte) ([]byte, error)
+	Invoke(txID string, slot int, action string, dataB []byte) ([]byte, error)
 }
 
 // Querier ...
@@ -96,7 +98,8 @@ func (n *Notifier) Run() error {
 			case <-n.killChan:
 				return
 			case <-ticker.C:
-				n.Invoker.Invoke(0, "clock", nil)
+				txID := strconv.Itoa(rand.Intn(1E6))
+				n.Invoker.Invoke(txID, 0, "clock", nil)
 			case <-n.DoneChan:
 				return
 			}

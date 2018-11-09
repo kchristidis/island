@@ -8,12 +8,13 @@ import (
 )
 
 type FakeInvoker struct {
-	InvokeStub        func(int, string, []byte) ([]byte, error)
+	InvokeStub        func(string, int, string, []byte) ([]byte, error)
 	invokeMutex       sync.RWMutex
 	invokeArgsForCall []struct {
-		arg1 int
-		arg2 string
-		arg3 []byte
+		arg1 string
+		arg2 int
+		arg3 string
+		arg4 []byte
 	}
 	invokeReturns struct {
 		result1 []byte
@@ -27,23 +28,24 @@ type FakeInvoker struct {
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakeInvoker) Invoke(arg1 int, arg2 string, arg3 []byte) ([]byte, error) {
-	var arg3Copy []byte
-	if arg3 != nil {
-		arg3Copy = make([]byte, len(arg3))
-		copy(arg3Copy, arg3)
+func (fake *FakeInvoker) Invoke(arg1 string, arg2 int, arg3 string, arg4 []byte) ([]byte, error) {
+	var arg4Copy []byte
+	if arg4 != nil {
+		arg4Copy = make([]byte, len(arg4))
+		copy(arg4Copy, arg4)
 	}
 	fake.invokeMutex.Lock()
 	ret, specificReturn := fake.invokeReturnsOnCall[len(fake.invokeArgsForCall)]
 	fake.invokeArgsForCall = append(fake.invokeArgsForCall, struct {
-		arg1 int
-		arg2 string
-		arg3 []byte
-	}{arg1, arg2, arg3Copy})
-	fake.recordInvocation("Invoke", []interface{}{arg1, arg2, arg3Copy})
+		arg1 string
+		arg2 int
+		arg3 string
+		arg4 []byte
+	}{arg1, arg2, arg3, arg4Copy})
+	fake.recordInvocation("Invoke", []interface{}{arg1, arg2, arg3, arg4Copy})
 	fake.invokeMutex.Unlock()
 	if fake.InvokeStub != nil {
-		return fake.InvokeStub(arg1, arg2, arg3)
+		return fake.InvokeStub(arg1, arg2, arg3, arg4)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
@@ -58,17 +60,17 @@ func (fake *FakeInvoker) InvokeCallCount() int {
 	return len(fake.invokeArgsForCall)
 }
 
-func (fake *FakeInvoker) InvokeCalls(stub func(int, string, []byte) ([]byte, error)) {
+func (fake *FakeInvoker) InvokeCalls(stub func(string, int, string, []byte) ([]byte, error)) {
 	fake.invokeMutex.Lock()
 	defer fake.invokeMutex.Unlock()
 	fake.InvokeStub = stub
 }
 
-func (fake *FakeInvoker) InvokeArgsForCall(i int) (int, string, []byte) {
+func (fake *FakeInvoker) InvokeArgsForCall(i int) (string, int, string, []byte) {
 	fake.invokeMutex.RLock()
 	defer fake.invokeMutex.RUnlock()
 	argsForCall := fake.invokeArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
 }
 
 func (fake *FakeInvoker) InvokeReturns(result1 []byte, result2 error) {
