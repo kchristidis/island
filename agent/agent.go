@@ -255,7 +255,7 @@ func (a *Agent) Sell(rowIdx int) error {
 			elapsed := int64(timeEnd.Sub(timeStart) / time.Millisecond)
 			a.TransactionChan <- stats.Transaction{
 				ID:              txID,
-				Type:            "buy",
+				Type:            "sell",
 				Status:          err.Error(),
 				LatencyInMillis: elapsed,
 			}
@@ -266,7 +266,7 @@ func (a *Agent) Sell(rowIdx int) error {
 		elapsed := int64(timeEnd.Sub(timeStart) / time.Millisecond)
 		a.TransactionChan <- stats.Transaction{
 			ID:              txID,
-			Type:            "buy",
+			Type:            "sell",
 			Status:          "success",
 			LatencyInMillis: elapsed,
 		}
