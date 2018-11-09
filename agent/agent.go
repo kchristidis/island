@@ -200,8 +200,6 @@ func (a *Agent) Buy(rowIdx int) error {
 		}
 		timeStart := time.Now()
 		if _, err := a.Invoker.Invoke(txID, rowIdx, "buy", encBid); err != nil {
-			msg := fmt.Sprintf("[agent %d] Unable to invoke 'buy' for row %d: %s\n", a.ID, rowIdx, err)
-			fmt.Fprintln(a.Writer, msg)
 			// Update stats
 			timeEnd := time.Now()
 			elapsed := int64(timeEnd.Sub(timeStart) / time.Millisecond)
@@ -211,6 +209,8 @@ func (a *Agent) Buy(rowIdx int) error {
 				Status:          err.Error(),
 				LatencyInMillis: elapsed,
 			}
+			msg := fmt.Sprintf("[agent %d] Unable to invoke 'buy' for row %d: %s\n", a.ID, rowIdx, err)
+			fmt.Fprintln(a.Writer, msg)
 			return errors.New(msg)
 		}
 		// Update stats
@@ -248,8 +248,6 @@ func (a *Agent) Sell(rowIdx int) error {
 		}
 		timeStart := time.Now()
 		if _, err := a.Invoker.Invoke(txID, rowIdx, "sell", encBid); err != nil {
-			msg := fmt.Sprintf("[agent %d] Unable to invoke 'sell' for row %d: %s", a.ID, rowIdx, err)
-			fmt.Fprintln(a.Writer, msg)
 			// Update stats
 			timeEnd := time.Now()
 			elapsed := int64(timeEnd.Sub(timeStart) / time.Millisecond)
@@ -259,6 +257,8 @@ func (a *Agent) Sell(rowIdx int) error {
 				Status:          err.Error(),
 				LatencyInMillis: elapsed,
 			}
+			msg := fmt.Sprintf("[agent %d] Unable to invoke 'sell' for row %d: %s", a.ID, rowIdx, err)
+			fmt.Fprintln(a.Writer, msg)
 			return errors.New(msg)
 		}
 		// Update stats
