@@ -42,7 +42,7 @@ type Transaction struct {
 	ID              string
 	Type            string
 	Status          string
-	LatencyInMillis int
+	LatencyInMillis int64
 }
 
 // TransactionStats ...
