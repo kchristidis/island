@@ -6,20 +6,22 @@ import (
 )
 
 // We are collecting stats on three different keys:
-// - slotNum: energy used (floa64) | hi (float64) | energy generated (float64) |  lo (float64)
+// - slotNum: energy used (floa64) | hi (float64) | energy generated (float64) |  lo (float64) | energy traded (float64) |  ppu_traded (float64)
 // - blockNum: fileSize (int)
-// - txID: type (string) | latency in ms (int) | status (string)
+// - txID: type (string) | status (string) | latency in ms (int)
 
 // TraceLength ...
 const TraceLength = 35036
 
 // Slot ...
 type Slot struct {
-	Number    int
-	EnergyUse float64
-	PricePaid float64
-	EnergyGen float64
-	PriceSold float64
+	Number       int
+	EnergyUse    float64
+	PricePaid    float64
+	EnergyGen    float64
+	PriceSold    float64
+	EnergyTraded float64
+	PriceTraded  float64
 }
 
 // SlotStats ...
@@ -106,6 +108,7 @@ func (c *Collector) SlotCalc(newLine Slot, aggStats *[TraceLength]Slot) {
 	if slotNum > LargestSlotSeen {
 		LargestSlotSeen = slotNum
 	}
+
 	if ((*aggStats)[slotNum] == Slot{}) {
 		(*aggStats)[slotNum] = newLine
 	} else {
@@ -120,6 +123,11 @@ func (c *Collector) SlotCalc(newLine Slot, aggStats *[TraceLength]Slot) {
 		if curLine.PriceSold < newLine.PriceSold {
 			curLine.PriceSold = newLine.PriceSold
 		}
+
+		curLine.EnergyTraded = newLine.EnergyTraded
+		curLine.PriceTraded = newLine.PriceTraded
+		curLine.EnergyUse -= newLine.EnergyTraded
+		curLine.EnergyGen -= newLine.EnergyTraded
 
 		(*aggStats)[slotNum] = curLine
 	}

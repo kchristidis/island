@@ -54,6 +54,14 @@ OSwjLClaBdvj45YrUN3/i5LiIvblup9QpqshyEbSuT5gvhuf3jVmb08TJszihVXJ
 p2j5extRQ8Ua4T37+7UdkZMvJLEps9ic+IlJWYwKt1qM+ZIZuuitmwU=
 -----END RSA PRIVATE KEY-----`)
 
+// TraceLength ...
+const TraceLength = 35036
+
+type statsPerSlot struct {
+	lateTXsCount, lateBuysCount, lateSellsCount, lateDecryptsCount [TraceLength]int
+	duplTXsCount, duplBuysCount, duplSellsCount                    [TraceLength]int
+}
+
 func main() {
 	if err := shim.Start(new(contract)); err != nil {
 		println("Cannot establish handler with peer:", err)
@@ -253,12 +261,20 @@ func (oc *opContext) markEnd() pp.Response {
 		return shim.Error(msg)
 	}
 
+	// This is what we write in the chaincode's KV store.
 	var writeVal struct {
-		privKey    string
-		ppu, units float64
+		PrivKey    string
+		PPU, Units float64
 	}
 
-	var respPayload []byte
+	// This is what we return to the caller.
+	var respVal struct {
+		Msg        string
+		Slot       int
+		PPU, Units float64
+	}
+
+	var respB []byte
 
 	slotNum, _ := strconv.Atoi(oc.slot)
 
@@ -267,7 +283,7 @@ func (oc *opContext) markEnd() pp.Response {
 	sbMutex.RLock()
 	defer sbMutex.RUnlock()
 
-	msg = fmt.Sprintf("[%s] Buyer bids for slot %d:", oc.txID, slotNum)
+	msg := fmt.Sprintf("[%s] Buyer bids for slot %d:", oc.txID, slotNum)
 	fmt.Fprintln(os.Stdout, msg)
 	if len(buyerBids[slotNum]) > 0 {
 		for i, v := range buyerBids[slotNum] {
@@ -294,17 +310,25 @@ func (oc *opContext) markEnd() pp.Response {
 			msg := fmt.Sprintf("[%s] Cannot find clearing price for slot %s: %s", oc.txID, oc.slot, err.Error())
 			fmt.Fprintln(os.Stdout, msg)
 		} else {
-			writeVal.ppu = res.PricePerUnit
-			writeVal.units = res.Units
-			msg := fmt.Sprintf("[%s] %.6f kWh were cleared at %.2f ç/kWh in slot %s ✅", oc.txID, writeVal.units, writeVal.ppu, oc.slot)
+			writeVal.PPU = res.PricePerUnit
+			writeVal.Units = res.Units
+			msg := fmt.Sprintf("[%s] %.6f kWh were cleared at %.3f ç/kWh in slot %s ✅", oc.txID, writeVal.Units, writeVal.PPU, oc.slot)
 			fmt.Fprintln(os.Stdout, msg)
-			respPayload = []byte(msg)
+
+			respVal.Msg = msg
+			respVal.Slot = slotNum
+			respVal.PPU = writeVal.PPU
+			respVal.Units = writeVal.Units
 		}
 	} else {
-		respPayload = []byte(fmt.Sprintf("No market for slot %d (buyer bids: %d, seller bids: %d)", slotNum, len(buyerBids[slotNum]), len(sellerBids[slotNum])))
+		msg := fmt.Sprintf("No market for slot %d (buyer bids: %d, seller bids: %d) 😔", slotNum, len(buyerBids[slotNum]), len(sellerBids[slotNum]))
+		fmt.Fprintln(os.Stdout, msg)
+
+		respVal.Msg = msg
+		respVal.Slot = slotNum
 	}
 
-	writeVal.privKey = string(oc.data)
+	writeVal.PrivKey = string(oc.data)
 
 	writeBytes, err := json.Marshal(writeVal)
 	if err != nil {
@@ -329,7 +353,14 @@ func (oc *opContext) markEnd() pp.Response {
 		}
 	}
 
-	return shim.Success(respPayload)
+	respB, err = json.Marshal(respVal)
+	if err != nil {
+		msg := fmt.Sprintf("[%s] Cannot marshal response: %s", oc.txID, err.Error())
+		fmt.Fprintln(os.Stdout, msg)
+		return shim.Error(msg)
+	}
+
+	return shim.Success(respB)
 }
 
 func (oc *opContext) clock() pp.Response {
@@ -361,6 +392,46 @@ func (oc *opContext) clock() pp.Response {
 }
 
 func (oc *opContext) query() pp.Response {
+	key := []string{oc.slot, string(oc.action)} // The partial composite key is: slot_number + action
+	iter, err := oc.stub.GetStateByPartialCompositeKey("", key)
+	if err != nil {
+		msg := fmt.Sprintf("[%s] Cannot create iterator for key %s: %s", oc.txID, key, err.Error())
+		fmt.Fprintln(os.Stdout, msg)
+		return shim.Error(msg)
+	}
+	defer iter.Close()
+
+	if !iter.HasNext() {
+		msg := fmt.Sprintf("[%s] No values exist for partial key %s", oc.txID, key)
+		fmt.Fprintln(os.Stdout, msg)
+		return shim.Error(msg)
+	}
+
+	var resp []string
+	for iter.HasNext() {
+		respRange, err := iter.Next()
+		if err != nil {
+			msg := fmt.Sprintf("[%s] Failed during iteration on key %s: %s", oc.txID, key, err.Error())
+			fmt.Fprintln(os.Stdout, msg)
+			return shim.Error(msg)
+		}
+		item := string(respRange.Value)
+		msg := fmt.Sprintf("[%s] Adding [%s] to the response payload for key %s", oc.txID, item, key)
+		fmt.Fprintln(os.Stdout, msg)
+		resp = append(resp, item)
+	}
+
+	respB, err := json.Marshal(resp)
+	if err != nil {
+		msg := fmt.Sprintf("[%s] Cannot marshal response: %s", oc.txID, err.Error())
+		fmt.Fprintln(os.Stdout, msg)
+		return shim.Error(msg)
+	}
+
+	return shim.Success(respB)
+}
+
+func (oc *opContext) queryMarketOp() pp.Response {
 	key := []string{oc.slot, string(oc.action)} // The partial composite key is: slot_number + action
 	iter, err := oc.stub.GetStateByPartialCompositeKey("", key)
 	if err != nil {

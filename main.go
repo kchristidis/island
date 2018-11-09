@@ -157,7 +157,7 @@ func run() error {
 
 	// Set up and launch the agents
 
-	markendagent = markend.New(sdkctx, snotifier, privkeybytes, statstranc, writer, donec)
+	markendagent = markend.New(sdkctx, snotifier, privkeybytes, statslotc, statstranc, writer, donec)
 	wg2.Add(1)
 	go func() {
 		if err := markendagent.Run(); err != nil {
@@ -242,7 +242,8 @@ func run() error {
 
 	for _, b := range stats.BlockStats {
 		fmt.Fprintf(writer,
-			"[block: %d] %f kiB\n",
+			"[block: %d]"+
+				"\t%f kiB\n",
 			b.Number,
 			b.SizeInKB,
 		)
@@ -252,10 +253,14 @@ func run() error {
 
 	for i := 0; i <= stats.LargestSlotSeen; i++ {
 		fmt.Fprintf(writer,
-			"[slot: %d] up to %.3f kWh bought from the grid @ %.3f ç/kWh - up to %.3f kWh sold to grid @ %.3f ç/kWh\n",
+			"[slot: %d]"+
+				"\t%.3f kWh bought from the grid @ %.3f ç/kWh"+
+				"\t\t%.3f kWh sold to grid @ %.3f ç/kWh"+
+				"\t\t%.3f kWh of demand met internally @ %.3f ç/kWh\n",
 			stats.SlotStats[i].Number,
 			stats.SlotStats[i].EnergyUse, stats.SlotStats[i].PricePaid,
 			stats.SlotStats[i].EnergyGen, stats.SlotStats[i].PriceSold,
+			stats.SlotStats[i].EnergyTraded, stats.SlotStats[i].PriceTraded,
 		)
 	}
 
@@ -263,7 +268,10 @@ func run() error {
 
 	for _, tx := range stats.TransactionStats {
 		fmt.Fprintf(writer,
-			"[txID: %s]\tlatency:%d ms\t\ttype:%s\tstatus:%s\n",
+			"[txID: %s]"+
+				"\tlatency:%d ms"+
+				"\t\ttype:%s"+
+				"\t\tstatus:%s\n",
 			tx.ID,
 			tx.LatencyInMillis,
 			tx.Type,

@@ -1,10 +1,12 @@
 package markend
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"math/rand"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -34,6 +36,7 @@ type Agent struct {
 
 	PrivKeyBytes []byte
 
+	SlotChan        chan stats.Slot        // Used to feed the stats collector.
 	TransactionChan chan stats.Transaction // Used to feed the stats collector.
 
 	SlotQueue chan int   // The agent's trigger/input — an agent acts whenever a new slot is pushed through this channel.
@@ -50,13 +53,16 @@ type Agent struct {
 // New ...
 func New(
 	invoker Invoker, slotnotifier Notifier,
-	privKeyBytes []byte, transactionc chan stats.Transaction,
+	privKeyBytes []byte,
+	slotc chan stats.Slot, transactionc chan stats.Transaction,
 	writer io.Writer, donec chan struct{}) *Agent {
 	return &Agent{
 		Invoker:  invoker,
 		Notifier: slotnotifier,
 
-		PrivKeyBytes:    privKeyBytes,
+		PrivKeyBytes: privKeyBytes,
+
+		SlotChan:        slotc,
 		TransactionChan: transactionc,
 
 		SlotQueue: make(chan int, BufferLen),
@@ -125,8 +131,29 @@ func (a *Agent) Run() error {
 						Status:          "success",
 						LatencyInMillis: elapsed,
 					}
-					msg := fmt.Sprintf("[markend agent] invocation response:\n\t%s\n", resp)
+
+					// This is the schema we expect from the markEnd response.
+					var respVal struct {
+						Msg        string
+						Slot       int
+						PPU, Units float64
+					}
+
+					if err := json.Unmarshal(resp, &respVal); err != nil {
+						msg := fmt.Sprintf("[%s] Cannot unmarshal returned response: %s", txID, err.Error())
+						fmt.Fprintln(os.Stdout, msg)
+						a.ErrChan <- errors.New(msg)
+					}
+
+					msg := fmt.Sprintf("[markend agent] invocation response:\n\t%s\n", respVal.Msg)
 					fmt.Fprintf(a.Writer, msg)
+					if slot > -1 { // The markEnd call @ -1 is useless.
+						a.SlotChan <- stats.Slot{
+							Number:       slot,
+							EnergyTraded: respVal.Units, // It's already in kWh, no need to convert
+							PriceTraded:  respVal.PPU,
+						}
+					}
 				}
 			case <-a.DoneChan:
 				return
