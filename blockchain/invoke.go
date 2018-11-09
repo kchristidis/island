@@ -2,7 +2,6 @@ package blockchain
 
 import (
 	"fmt"
-	"math/rand"
 	"strconv"
 	"time"
 
@@ -17,8 +16,8 @@ const (
 )
 
 // Invoke ...
-func (sc *SDKContext) Invoke(slot int, action string, dataB []byte) ([]byte, error) {
-	eventB := []byte(strconv.Itoa(rand.Intn(1E6)))
+func (sc *SDKContext) Invoke(txID string, slot int, action string, dataB []byte) ([]byte, error) {
+	eventB := []byte(txID)
 	actionB := []byte(action)
 	slotB := []byte(strconv.Itoa(slot))
 
