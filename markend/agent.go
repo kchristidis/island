@@ -4,7 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand"
+	"strconv"
 	"sync"
+	"time"
 
 	"github.com/kchristidis/exp2/stats"
 )
@@ -15,7 +18,7 @@ const BufferLen = 100
 // Invoker ...
 //go:generate counterfeiter . Invoker
 type Invoker interface {
-	Invoke(slot int, action string, dataB []byte) ([]byte, error)
+	Invoke(txID string, slot int, action string, dataB []byte) ([]byte, error)
 }
 
 // Notifier ...
@@ -97,11 +100,31 @@ func (a *Agent) Run() error {
 			case slot := <-a.MarkQueue:
 				msg := fmt.Sprintf("[markend agent] Invoking 'markEnd' for slot %d", slot)
 				fmt.Fprintln(a.Writer, msg)
-				resp, err := a.Invoker.Invoke(slot, "markEnd", a.PrivKeyBytes)
+				txID := strconv.Itoa(rand.Intn(1E6))
+				timeStart := time.Now()
+				resp, err := a.Invoker.Invoke(txID, slot, "markEnd", a.PrivKeyBytes)
 				if err != nil {
 					msg := fmt.Sprintf("[markend agent] Unable to invoke 'markEnd' for slot %d: %s\n", slot, err)
+					// Update stats
+					timeEnd := time.Now()
+					elapsed := int64(timeEnd.Sub(timeStart) / time.Millisecond)
+					a.TransactionChan <- stats.Transaction{
+						ID:              txID,
+						Type:            "markend",
+						Status:          err.Error(),
+						LatencyInMillis: elapsed,
+					}
 					a.ErrChan <- errors.New(msg)
 				} else {
+					// Update stats
+					timeEnd := time.Now()
+					elapsed := int64(timeEnd.Sub(timeStart) / time.Millisecond)
+					a.TransactionChan <- stats.Transaction{
+						ID:              txID,
+						Type:            "markend",
+						Status:          "success",
+						LatencyInMillis: elapsed,
+					}
 					msg := fmt.Sprintf("[markend agent] invocation response:\n\t%s\n", resp)
 					fmt.Fprintf(a.Writer, msg)
 				}
