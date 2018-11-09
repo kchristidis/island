@@ -1,6 +1,7 @@
 package markend_test
 
 import (
+	"encoding/json"
 	"errors"
 	"path/filepath"
 	"testing"
@@ -19,10 +20,17 @@ import (
 func TestAgent(t *testing.T) {
 	g := NewGomegaWithT(t)
 
+	var respVal struct {
+		msg        string
+		slot       int
+		ppu, units float64
+	}
+
 	privkeypath := filepath.Join("..", "crypto", "priv.pem")
 	privkey, err := crypto.LoadPrivate(privkeypath)
 	require.NoError(t, err)
 	privkeybytes := crypto.SerializePrivate(privkey)
+	slotc := make(chan stats.Slot, 10)               // A large enough buffer so that we don't have to worry about draining it.
 	transactionc := make(chan stats.Transaction, 10) // A large enough buffer so that we don't have to worry about draining it.
 
 	t.Run("notifier registration fails", func(t *testing.T) {
@@ -32,7 +40,7 @@ func TestAgent(t *testing.T) {
 		bfr := gbytes.NewBuffer()
 		donec := make(chan struct{})
 
-		m := markend.New(invoker, slotnotifier, privkeybytes, transactionc, bfr, donec)
+		m := markend.New(invoker, slotnotifier, privkeybytes, slotc, transactionc, bfr, donec)
 
 		slotnotifier.RegisterReturns(false)
 
@@ -54,12 +62,11 @@ func TestAgent(t *testing.T) {
 	t.Run("done chan closes", func(t *testing.T) {
 		invoker := new(markendfakes.FakeInvoker)
 		slotnotifier := new(markendfakes.FakeNotifier)
-		transactionc := make(chan stats.Transaction, 10) // A large enough buffer so that we don't have to worry about draining it.
 
 		bfr := gbytes.NewBuffer()
 		donec := make(chan struct{})
 
-		m := markend.New(invoker, slotnotifier, privkeybytes, transactionc, bfr, donec)
+		m := markend.New(invoker, slotnotifier, privkeybytes, slotc, transactionc, bfr, donec)
 
 		slotnotifier.RegisterReturns(true)
 
@@ -84,7 +91,7 @@ func TestAgent(t *testing.T) {
 		bfr := gbytes.NewBuffer()
 		donec := make(chan struct{})
 
-		m := markend.New(invoker, slotnotifier, privkeybytes, transactionc, bfr, donec)
+		m := markend.New(invoker, slotnotifier, privkeybytes, slotc, transactionc, bfr, donec)
 
 		slotnotifier.RegisterReturns(true)
 
@@ -95,7 +102,9 @@ func TestAgent(t *testing.T) {
 			close(deadc)
 		}()
 
-		invoker.InvokeReturns(nil, nil)
+		respVal.slot = -1
+		respB, _ := json.Marshal(respVal)
+		invoker.InvokeReturns(respB, nil)
 		m.SlotQueue <- 0
 
 		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Processing slot -1"))
@@ -113,7 +122,7 @@ func TestAgent(t *testing.T) {
 		bfr := gbytes.NewBuffer()
 		donec := make(chan struct{})
 
-		m := markend.New(invoker, slotnotifier, privkeybytes, transactionc, bfr, donec)
+		m := markend.New(invoker, slotnotifier, privkeybytes, slotc, transactionc, bfr, donec)
 
 		slotnotifier.RegisterReturns(true)
 
@@ -141,7 +150,7 @@ func TestAgent(t *testing.T) {
 		bfr := gbytes.NewBuffer()
 		donec := make(chan struct{})
 
-		m := markend.New(invoker, slotnotifier, privkeybytes, transactionc, bfr, donec)
+		m := markend.New(invoker, slotnotifier, privkeybytes, slotc, transactionc, bfr, donec)
 
 		slotnotifier.RegisterReturns(true)
 
