@@ -1,7 +1,6 @@
 package blockchain
 
 import (
-	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -9,7 +8,7 @@ import (
 )
 
 // Query ...
-func (sc *SDKContext) Query(slot int, action string) ([]string, error) {
+func (sc *SDKContext) Query(slot int, action string) ([]byte, error) {
 	slotB := []byte(strconv.Itoa(slot))
 	actionB := []byte(action)
 
@@ -19,13 +18,8 @@ func (sc *SDKContext) Query(slot int, action string) ([]string, error) {
 		Args:        [][]byte{nil, actionB, slotB, nil},
 	})
 	if err != nil {
-		return []string{}, fmt.Errorf("query for %s @ %d failed: %s", action, slot, err.Error())
+		return nil, fmt.Errorf("query failed: %s", err.Error())
 	}
 
-	var respS []string
-	if err := json.Unmarshal(resp.Payload, &respS); err != nil {
-		return []string{}, fmt.Errorf("cannot unmarshal returned response for %s @ %d: %s", action, slot, err.Error())
-	}
-
-	return respS, nil
+	return resp.Payload, nil
 }

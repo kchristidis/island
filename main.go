@@ -2,11 +2,13 @@ package main
 
 import (
 	"crypto/rsa"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"sync"
 	"time"
 
@@ -20,8 +22,11 @@ import (
 	"github.com/kchristidis/exp2/stats"
 )
 
-// StatChannelBuffer ...
-const StatChannelBuffer = 100
+// Constants ...
+const (
+	StatChannelBuffer = 100
+	TraceLength       = 35036
+)
 
 func main() {
 	if err := run(); err != nil {
@@ -230,7 +235,7 @@ func run() error {
 
 	println()
 
-	fmt.Fprintln(os.Stdout, "Time to collect & print results...")
+	fmt.Fprintln(os.Stdout, "Time to collect & print the results...")
 
 	println()
 
@@ -242,7 +247,7 @@ func run() error {
 
 	for _, b := range stats.BlockStats {
 		fmt.Fprintf(writer,
-			"[block: %d]"+
+			"[block: %012d]"+
 				"\t%f kiB\n",
 			b.Number,
 			b.SizeInKB,
@@ -253,7 +258,7 @@ func run() error {
 
 	for i := 0; i <= stats.LargestSlotSeen; i++ {
 		fmt.Fprintf(writer,
-			"[slot: %d]"+
+			"[slot: %012d]"+
 				"\t%.3f kWh bought from the grid @ %.3f ç/kWh"+
 				"\t\t%.3f kWh sold to grid @ %.3f ç/kWh"+
 				"\t\t%.3f kWh of demand met internally @ %.3f ç/kWh\n",
@@ -267,27 +272,57 @@ func run() error {
 	println()
 
 	for _, tx := range stats.TransactionStats {
+		idNum, _ := strconv.Atoi(tx.ID)
 		fmt.Fprintf(writer,
-			"[txID: %s]"+
+			"[txID: %012d]"+
 				"\tlatency:%d ms"+
 				"\t\ttype:%s"+
 				"\t\tstatus:%s\n",
-			tx.ID,
+			idNum,
 			tx.LatencyInMillis,
 			tx.Type,
 			tx.Status,
 		)
 	}
 
-	/* if resp, err := sdkctx.Query(2, "bid"); err != nil {
+	println()
+
+	type aggregateStats struct {
+		LateTXsCount, LateBuysCount, LateSellsCount [TraceLength]int
+	}
+
+	var (
+		aggStats aggregateStats
+		resp     []byte
+	)
+
+	if resp, err = sdkctx.Query(-1, "aggregate"); err != nil {
 		return err
-	} else {
-		fmt.Fprintf(os.Stdout, "Response from chaincode query: %s\n", resp)
-	} */
+	}
+
+	if err := json.Unmarshal(resp, &aggStats); err != nil {
+		msg := fmt.Sprintf("Cannot unmarshal returned response: %s", err.Error())
+		fmt.Fprintln(writer, msg)
+	}
+
+	fmt.Fprintln(writer, "Late transactions:")
+
+	for i := 0; i < stats.LargestSlotSeen+1; i++ {
+		fmt.Fprintf(writer,
+			"[slot: %012d]"+
+				"\toverall: %d"+
+				"\t\tbuys: %d"+
+				"\t\tsells: %d\n",
+			i,
+			aggStats.LateTXsCount[i],
+			aggStats.LateBuysCount[i],
+			aggStats.LateSellsCount[i],
+		)
+	}
 
 	println()
 
-	fmt.Fprintf(os.Stdout, "Number of goroutines still running: %d\n", runtime.NumGoroutine())
+	fmt.Fprintf(writer, "Number of goroutines still running: %d\n", runtime.NumGoroutine())
 
 	return nil
 }
