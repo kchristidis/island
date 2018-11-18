@@ -1,9 +1,5 @@
 version: '2'
 
-networks:
-
-  example:
-
 services:
 
   joe.example.com:
@@ -28,8 +24,6 @@ services:
       - ./artifacts/system-channel.block:/var/hyperledger/orderer/system-channel.block
     ports:
       - 7050:7050
-    networks:
-      - example
 
   peer0.clark.example.com:
     container_name: peer0.clark.example.com
@@ -64,5 +58,3 @@ services:
       - joe.example.com
     links:
       - joe.example.com
-    networks:
-      - example
