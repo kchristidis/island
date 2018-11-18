@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/rsa"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,7 +17,7 @@ import (
 	"github.com/kchristidis/exp2/blockchain"
 	"github.com/kchristidis/exp2/blocknotifier"
 	"github.com/kchristidis/exp2/crypto"
-	"github.com/kchristidis/exp2/csv"
+	csvtrace "github.com/kchristidis/exp2/csv"
 	"github.com/kchristidis/exp2/markend"
 	"github.com/kchristidis/exp2/slotnotifier"
 	"github.com/kchristidis/exp2/stats"
@@ -26,6 +27,11 @@ import (
 const (
 	StatChannelBuffer = 100
 	TraceLength       = 35036
+
+	OutputDir   = "output"
+	OutputTran  = "tran.csv"
+	OutputSlot  = "slot.csv"
+	OutputBlock = "block.csv"
 )
 
 func main() {
@@ -92,8 +98,8 @@ func run() error {
 
 	// Load the trace
 
-	tracepath := filepath.Join("csv", csv.Filename)
-	trace, err = csv.Load(tracepath)
+	tracepath := filepath.Join("csv", csvtrace.Filename)
+	trace, err = csvtrace.Load(tracepath)
 	if err != nil {
 		return nil
 	}
@@ -173,9 +179,9 @@ func run() error {
 		wg2.Done()
 	}()
 
-	agents = make([]*agent.Agent, csv.IDCount)
+	agents = make([]*agent.Agent, csvtrace.IDCount)
 	// for i, ID := range []int{171, 1103} // ATTN: Temporary modification:
-	for i, ID := range csv.IDs {
+	for i, ID := range csvtrace.IDs {
 		agents[i] = agent.New(sdkctx, snotifier, pubkey, trace[ID], ID, statslotc, statstranc, writer, donec)
 		wg1.Add(1)
 		go func(i int) {
@@ -243,46 +249,104 @@ func run() error {
 	close(donestatsc)
 	wg3.Wait()
 
-	println()
-
-	for _, b := range stats.BlockStats {
-		fmt.Fprintf(writer,
-			"[block: %012d]"+
-				"\t%f kiB\n",
-			b.Number,
-			b.SizeInKB,
-		)
+	tranfile, err := os.Create(filepath.Join(OutputDir, OutputTran))
+	if err != nil {
+		return err
 	}
+	defer tranfile.Close()
 
-	println()
-
-	for i := 0; i <= stats.LargestSlotSeen; i++ {
-		fmt.Fprintf(writer,
-			"[slot: %012d]"+
-				"\t%.3f kWh bought from the grid @ %.3f ç/kWh"+
-				"\t\t%.3f kWh sold to grid @ %.3f ç/kWh"+
-				"\t\t%.3f kWh of demand met internally @ %.3f ç/kWh\n",
-			stats.SlotStats[i].Number,
-			stats.SlotStats[i].EnergyUse, stats.SlotStats[i].PricePaid,
-			stats.SlotStats[i].EnergyGen, stats.SlotStats[i].PriceSold,
-			stats.SlotStats[i].EnergyTraded, stats.SlotStats[i].PriceTraded,
-		)
+	tranwriter := csv.NewWriter(tranfile)
+	if err := tranwriter.Write([]string{"tx ID", "latency (ms)", "tx type", "tx status"}); err != nil {
+		return err
 	}
+	defer func() error {
+		tranwriter.Flush()
+		if err := tranwriter.Error(); err != nil {
+			return err
+		}
+		return nil
+	}()
+
+	blockfile, err := os.Create(filepath.Join(OutputDir, OutputBlock))
+	if err != nil {
+		return err
+	}
+	defer blockfile.Close()
+
+	blockwriter := csv.NewWriter(blockfile)
+	if err := blockwriter.Write([]string{"block num", "filesize (KiB)"}); err != nil {
+		return err
+	}
+	defer func() error {
+		blockwriter.Flush()
+		if err := blockwriter.Error(); err != nil {
+			return err
+		}
+		return nil
+	}()
+
+	slotfile, err := os.Create(filepath.Join(OutputDir, OutputSlot))
+	if err != nil {
+		return err
+	}
+	defer slotfile.Close()
+
+	slotwriter := csv.NewWriter(slotfile)
+	if err := slotwriter.Write([]string{"slot num",
+		"bfg qty (kWh)", "bfg ppu (ç/kWh)",
+		"stg qty (kWh)", "stg ppu (ç/kWh)",
+		"dmi qty (kWh)", "dmi ppu (ç/kWh)",
+		"late cnt (all)", "late cnt (buy)", "late cnt (sell)"}); err != nil {
+		return err
+	}
+	defer func() error {
+		slotwriter.Flush()
+		if err := slotwriter.Error(); err != nil {
+			return err
+		}
+		return nil
+	}()
 
 	println()
 
+	fmt.Fprintln(writer, "Transaction stats")
 	for _, tx := range stats.TransactionStats {
 		idNum, _ := strconv.Atoi(tx.ID)
+		idVal := fmt.Sprintf("%012d", idNum)
+		latVal := fmt.Sprintf("%d", tx.LatencyInMillis)
 		fmt.Fprintf(writer,
-			"[txID: %012d]"+
-				"\tlatency:%d ms"+
+			"[txID: %s]"+
+				"\tlatency:%s ms"+
 				"\t\ttype:%s"+
 				"\t\tstatus:%s\n",
-			idNum,
-			tx.LatencyInMillis,
+			idVal,
+			latVal,
 			tx.Type,
 			tx.Status,
 		)
+		if err := tranwriter.Write([]string{idVal, latVal, tx.Type, tx.Status}); err != nil {
+			return err
+		}
+	}
+
+	println()
+
+	fmt.Fprintln(writer, "Block stats")
+	for _, b := range stats.BlockStats {
+		if uint64(b.Number) < startfromblock {
+			continue
+		}
+		numVal := fmt.Sprintf("%012d", b.Number)
+		sizeVal := fmt.Sprintf("%.1f", b.SizeInKB)
+		fmt.Fprintf(writer,
+			"[block: %s]"+
+				"\t%s KiB\n",
+			numVal,
+			sizeVal,
+		)
+		if err := blockwriter.Write([]string{numVal, sizeVal}); err != nil {
+			return err
+		}
 	}
 
 	println()
@@ -305,19 +369,39 @@ func run() error {
 		fmt.Fprintln(writer, msg)
 	}
 
-	fmt.Fprintln(writer, "Late transactions:")
-
-	for i := 0; i < stats.LargestSlotSeen+1; i++ {
+	fmt.Fprintln(writer, "Slot stats")
+	for i := 0; i <= stats.LargestSlotSeen; i++ {
+		slotVal := fmt.Sprintf("%012d", stats.SlotStats[i].Number)
+		bfgQtyVal := fmt.Sprintf("%.3f", stats.SlotStats[i].EnergyUse)
+		bfgPpuVal := fmt.Sprintf("%.3f", stats.SlotStats[i].PricePaid)
+		stgQtyVal := fmt.Sprintf("%.3f", stats.SlotStats[i].EnergyGen)
+		stgPpuVal := fmt.Sprintf("%.3f", stats.SlotStats[i].PriceSold)
+		dmiQtyVal := fmt.Sprintf("%.3f", stats.SlotStats[i].EnergyTraded)
+		dmiPpuVal := fmt.Sprintf("%.3f", stats.SlotStats[i].PriceTraded)
+		lateAllVal := fmt.Sprintf("%d", aggStats.LateTXsCount[i])
+		lateBuyVal := fmt.Sprintf("%d", aggStats.LateBuysCount[i])
+		lateSellVal := fmt.Sprintf("%d", aggStats.LateSellsCount[i])
 		fmt.Fprintf(writer,
-			"[slot: %012d]"+
-				"\toverall: %d"+
-				"\t\tbuys: %d"+
-				"\t\tsells: %d\n",
-			i,
-			aggStats.LateTXsCount[i],
-			aggStats.LateBuysCount[i],
-			aggStats.LateSellsCount[i],
+			"[slot: %s]"+
+				"\t%s kWh bought from the grid @ %s ç/kWh"+
+				"\t\t%s kWh sold to grid @ %s ç/kWh"+
+				"\t\t%s kWh of demand met internally @ %s ç/kWh"+
+				"\t\t%s late transactions (total)"+
+				"\t\t%s late buy transactions"+
+				"\t\t%s late sell transactions\n",
+			slotVal,
+			bfgQtyVal, bfgPpuVal,
+			stgQtyVal, stgPpuVal,
+			dmiQtyVal, dmiPpuVal,
+			lateAllVal, lateBuyVal, lateSellVal,
 		)
+		if err := slotwriter.Write([]string{slotVal,
+			bfgQtyVal, bfgPpuVal,
+			stgQtyVal, stgPpuVal,
+			dmiQtyVal, dmiPpuVal,
+			lateAllVal, lateBuyVal, lateSellVal}); err != nil {
+			return err
+		}
 	}
 
 	println()

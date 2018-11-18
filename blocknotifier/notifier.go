@@ -144,7 +144,7 @@ func (n *Notifier) Run() error {
 						Number:   int(n.MostRecentBlockHeight) - 1,
 						SizeInKB: float32(len(blockBytes)) / 1024,
 					}
-					// msg := fmt.Sprintf("[block notifier] Block %d size in kiB: %d", n.MostRecentBlockHeight-1, len(blockBytes)/1024)
+					// msg := fmt.Sprintf("[block notifier] Block %d size in KiB: %d", n.MostRecentBlockHeight-1, len(blockBytes)/1024)
 					// fmt.Fprintln(n.Writer, msg)
 				}
 			}
