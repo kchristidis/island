@@ -4,7 +4,7 @@ package markendfakes
 import (
 	sync "sync"
 
-	markend "github.com/kchristidis/exp2/markend"
+	markend "github.com/kchristidis/island/markend"
 )
 
 type FakeInvoker struct {

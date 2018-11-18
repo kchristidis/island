@@ -3,9 +3,9 @@ client:
   logging:
     level: info
   cryptoconfig:
-    path: ${GOPATH}/src/github.com/kchristidis/exp2/fixtures/crypto-config
+    path: ${GOPATH}/src/github.com/kchristidis/island/fixtures/crypto-config
   credentialStore:
-    path: /tmp/exp2
+    path: /tmp/island
   BCCSP:
     security:
      enabled: true
@@ -43,7 +43,7 @@ orderers:
       fail-fast: false
       allow-insecure: false
     tlsCACerts:
-      path: ${GOPATH}/src/github.com/kchristidis/exp2/fixtures/crypto-config/ordererOrganizations/example.com/tlsca/tlsca.example.com-cert.pem
+      path: ${GOPATH}/src/github.com/kchristidis/island/fixtures/crypto-config/ordererOrganizations/example.com/tlsca/tlsca.example.com-cert.pem
 
 peers:
   peer0.clark.example.com:
@@ -57,7 +57,7 @@ peers:
       fail-fast: false
       allow-insecure: false
     tlsCACerts:
-      path: ${GOPATH}/src/github.com/kchristidis/exp2/fixtures/crypto-config/peerOrganizations/clark.example.com/tlsca/tlsca.clark.example.com-cert.pem
+      path: ${GOPATH}/src/github.com/kchristidis/island/fixtures/crypto-config/peerOrganizations/clark.example.com/tlsca/tlsca.clark.example.com-cert.pem
 
 entityMatchers:
   peer:

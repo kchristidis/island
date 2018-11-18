@@ -5,11 +5,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/kchristidis/exp2/agent"
-	"github.com/kchristidis/exp2/agent/agentfakes"
-	"github.com/kchristidis/exp2/crypto"
-	"github.com/kchristidis/exp2/stats"
-	"github.com/kchristidis/exp2/trace"
+	"github.com/kchristidis/island/agent"
+	"github.com/kchristidis/island/agent/agentfakes"
+	"github.com/kchristidis/island/crypto"
+	"github.com/kchristidis/island/stats"
+	"github.com/kchristidis/island/trace"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/stretchr/testify/require"
 

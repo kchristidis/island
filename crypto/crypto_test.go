@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/kchristidis/exp2/crypto"
+	"github.com/kchristidis/island/crypto"
 	"github.com/stretchr/testify/require"
 )
 

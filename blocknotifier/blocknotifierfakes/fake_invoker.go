@@ -4,7 +4,7 @@ package blocknotifierfakes
 import (
 	sync "sync"
 
-	blocknotifier "github.com/kchristidis/exp2/blocknotifier"
+	blocknotifier "github.com/kchristidis/island/blocknotifier"
 )
 
 type FakeInvoker struct {

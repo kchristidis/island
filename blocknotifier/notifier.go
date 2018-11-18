@@ -12,7 +12,7 @@ import (
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/ledger"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 	"github.com/hyperledger/fabric-sdk-go/third_party/github.com/hyperledger/fabric/protos/common"
-	"github.com/kchristidis/exp2/stats"
+	"github.com/kchristidis/island/stats"
 )
 
 // Invoker ...

@@ -17,5 +17,5 @@ vendor/*
 .DS_Store
 
 # Final binary and results
-exp2
+island
 output/*

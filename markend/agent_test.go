@@ -8,10 +8,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/kchristidis/exp2/crypto"
-	"github.com/kchristidis/exp2/markend"
-	"github.com/kchristidis/exp2/markend/markendfakes"
-	"github.com/kchristidis/exp2/stats"
+	"github.com/kchristidis/island/crypto"
+	"github.com/kchristidis/island/markend"
+	"github.com/kchristidis/island/markend/markendfakes"
+	"github.com/kchristidis/island/stats"
 	"github.com/onsi/gomega/gbytes"
 
 	. "github.com/onsi/gomega"

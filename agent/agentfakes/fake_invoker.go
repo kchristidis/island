@@ -4,7 +4,7 @@ package agentfakes
 import (
 	sync "sync"
 
-	agent "github.com/kchristidis/exp2/agent"
+	agent "github.com/kchristidis/island/agent"
 )
 
 type FakeInvoker struct {

@@ -13,14 +13,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kchristidis/exp2/agent"
-	"github.com/kchristidis/exp2/blockchain"
-	"github.com/kchristidis/exp2/blocknotifier"
-	"github.com/kchristidis/exp2/crypto"
-	"github.com/kchristidis/exp2/markend"
-	"github.com/kchristidis/exp2/slotnotifier"
-	"github.com/kchristidis/exp2/stats"
-	"github.com/kchristidis/exp2/trace"
+	"github.com/kchristidis/island/agent"
+	"github.com/kchristidis/island/blockchain"
+	"github.com/kchristidis/island/blocknotifier"
+	"github.com/kchristidis/island/crypto"
+	"github.com/kchristidis/island/markend"
+	"github.com/kchristidis/island/slotnotifier"
+	"github.com/kchristidis/island/stats"
+	"github.com/kchristidis/island/trace"
 )
 
 // Constants ...
@@ -130,11 +130,11 @@ func run() error {
 
 		OrdererID:   "joe.example.com",
 		ChannelID:   "clark-channel",
-		ChaincodeID: "exp2",
+		ChaincodeID: "island",
 
-		ChannelConfigPath:   os.Getenv("GOPATH") + "/src/github.com/kchristidis/exp2/fixtures/artifacts/clark-channel.tx",
+		ChannelConfigPath:   os.Getenv("GOPATH") + "/src/github.com/kchristidis/island/fixtures/artifacts/clark-channel.tx",
 		ChaincodeGoPath:     os.Getenv("GOPATH"),
-		ChaincodeSourcePath: "github.com/kchristidis/exp2/chaincode/",
+		ChaincodeSourcePath: "github.com/kchristidis/island/chaincode/",
 	}
 
 	if err = sdkctx.Setup(); err != nil {
