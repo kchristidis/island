@@ -17,10 +17,10 @@ import (
 	"github.com/kchristidis/exp2/blockchain"
 	"github.com/kchristidis/exp2/blocknotifier"
 	"github.com/kchristidis/exp2/crypto"
-	csvtrace "github.com/kchristidis/exp2/csv"
 	"github.com/kchristidis/exp2/markend"
 	"github.com/kchristidis/exp2/slotnotifier"
 	"github.com/kchristidis/exp2/stats"
+	"github.com/kchristidis/exp2/trace"
 )
 
 // Constants ...
@@ -58,7 +58,7 @@ func run() error {
 
 		privkeybytes []byte
 		pubkey       *rsa.PublicKey
-		trace        map[int][][]float64
+		tracemap     map[int][][]float64
 
 		slotc chan int
 
@@ -98,8 +98,8 @@ func run() error {
 
 	// Load the trace
 
-	tracepath := filepath.Join("csv", csvtrace.Filename)
-	trace, err = csvtrace.Load(tracepath)
+	tracepath := filepath.Join("trace", trace.Filename)
+	tracemap, err = trace.Load(tracepath)
 	if err != nil {
 		return nil
 	}
@@ -179,10 +179,10 @@ func run() error {
 		wg2.Done()
 	}()
 
-	agents = make([]*agent.Agent, csvtrace.IDCount)
+	agents = make([]*agent.Agent, trace.IDCount)
 	// for i, ID := range []int{171, 1103} // ATTN: Temporary modification:
-	for i, ID := range csvtrace.IDs {
-		agents[i] = agent.New(sdkctx, snotifier, pubkey, trace[ID], ID, statslotc, statstranc, writer, donec)
+	for i, ID := range trace.IDs {
+		agents[i] = agent.New(sdkctx, snotifier, pubkey, tracemap[ID], ID, statslotc, statstranc, writer, donec)
 		wg1.Add(1)
 		go func(i int) {
 			if err = agents[i].Run(); err != nil {

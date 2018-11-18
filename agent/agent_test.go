@@ -8,8 +8,8 @@ import (
 	"github.com/kchristidis/exp2/agent"
 	"github.com/kchristidis/exp2/agent/agentfakes"
 	"github.com/kchristidis/exp2/crypto"
-	"github.com/kchristidis/exp2/csv"
 	"github.com/kchristidis/exp2/stats"
+	"github.com/kchristidis/exp2/trace"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/stretchr/testify/require"
 
@@ -19,8 +19,8 @@ import (
 func TestAgent(t *testing.T) {
 	g := NewGomegaWithT(t)
 
-	path := filepath.Join("..", "csv", csv.Filename)
-	m, err := csv.Load(path)
+	path := filepath.Join("..", "trace", trace.Filename)
+	m, err := trace.Load(path)
 	require.NoError(t, err)
 
 	pubkeypath := filepath.Join("..", "crypto", "pub.pem")
@@ -37,7 +37,7 @@ func TestAgent(t *testing.T) {
 		bfr := gbytes.NewBuffer()
 		donec := make(chan struct{})
 
-		a := agent.New(invoker, slotnotifier, pubkey, m[csv.IDs[0]], csv.IDs[0], slotc, transactionc, bfr, donec)
+		a := agent.New(invoker, slotnotifier, pubkey, m[trace.IDs[0]], trace.IDs[0], slotc, transactionc, bfr, donec)
 
 		slotnotifier.RegisterReturns(false)
 
@@ -63,7 +63,7 @@ func TestAgent(t *testing.T) {
 		bfr := gbytes.NewBuffer()
 		donec := make(chan struct{})
 
-		a := agent.New(invoker, slotnotifier, pubkey, m[csv.IDs[0]], csv.IDs[0], slotc, transactionc, bfr, donec)
+		a := agent.New(invoker, slotnotifier, pubkey, m[trace.IDs[0]], trace.IDs[0], slotc, transactionc, bfr, donec)
 
 		slotnotifier.RegisterReturns(true)
 
@@ -88,7 +88,7 @@ func TestAgent(t *testing.T) {
 		bfr := gbytes.NewBuffer()
 		donec := make(chan struct{})
 
-		a := agent.New(invoker, slotnotifier, pubkey, m[csv.IDs[0]], csv.IDs[0], slotc, transactionc, bfr, donec)
+		a := agent.New(invoker, slotnotifier, pubkey, m[trace.IDs[0]], trace.IDs[0], slotc, transactionc, bfr, donec)
 
 		slotnotifier.RegisterReturns(true)
 
