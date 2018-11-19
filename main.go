@@ -4,6 +4,7 @@ import (
 	"crypto/rsa"
 	"encoding/csv"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -34,7 +35,11 @@ const (
 	OutputBlock = "block.csv"
 )
 
+var exp int
+
 func main() {
+	flag.IntVar(&exp, "exp", 2, "Set to the experiment you wish to simulate.")
+	flag.Parse()
 	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
 		os.Exit(1)
@@ -44,6 +49,9 @@ func main() {
 func run() error {
 	var (
 		err error
+
+		iter         int
+		outputprefix string
 
 		agents       []*agent.Agent
 		markendagent *markend.Agent
@@ -81,6 +89,9 @@ func run() error {
 	) */
 
 	// Global vars
+
+	iter++ // Which iteration is this? Used to name the files we're writing results to.
+	outputprefix = fmt.Sprintf("exp-%02d-run-%02d", exp, iter)
 
 	blocksperslot = 3
 	clockperiod = 500 * time.Millisecond
@@ -249,7 +260,14 @@ func run() error {
 	close(donestatsc)
 	wg3.Wait()
 
-	tranfile, err := os.Create(filepath.Join(OutputDir, OutputTran))
+	// Create the output dir if it's doesn't exist already
+	if _, err := os.Stat(OutputDir); os.IsNotExist(err) {
+		if err := os.Mkdir(OutputDir, 755); err != nil {
+			return err
+		}
+	}
+
+	tranfile, err := os.Create(filepath.Join(OutputDir, fmt.Sprintf("%s-%s", outputprefix, OutputTran)))
 	if err != nil {
 		return err
 	}
@@ -267,7 +285,7 @@ func run() error {
 		return nil
 	}()
 
-	blockfile, err := os.Create(filepath.Join(OutputDir, OutputBlock))
+	blockfile, err := os.Create(filepath.Join(OutputDir, fmt.Sprintf("%s-%s", outputprefix, OutputBlock)))
 	if err != nil {
 		return err
 	}
@@ -285,7 +303,7 @@ func run() error {
 		return nil
 	}()
 
-	slotfile, err := os.Create(filepath.Join(OutputDir, OutputSlot))
+	slotfile, err := os.Create(filepath.Join(OutputDir, fmt.Sprintf("%s-%s", outputprefix, OutputSlot)))
 	if err != nil {
 		return err
 	}

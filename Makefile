@@ -24,7 +24,7 @@ env-down:
 ##### RUN
 run:
 	@echo "Starting run..."
-	@./island
+	@./island -exp=2
 
 ##### CLEAN
 clean: env-down
