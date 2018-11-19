@@ -98,7 +98,7 @@ func New(invoker Invoker, notifier Notifier,
 
 // Run ...
 func (a *Agent) Run() error {
-	msg := fmt.Sprintf("[agent %d] Exited", a.ID)
+	msg := fmt.Sprintf("[agent %04d] Exited", a.ID)
 	defer fmt.Fprintln(a.Writer, msg)
 
 	defer func() {
@@ -107,12 +107,12 @@ func (a *Agent) Run() error {
 	}()
 
 	if ok := a.Notifier.Register(a.ID, a.SlotQueue); !ok {
-		msg := fmt.Sprintf("[agent %d] Unable to register with slot notifier", a.ID)
+		msg := fmt.Sprintf("[agent %04d] Unable to register with slot notifier", a.ID)
 		fmt.Fprintln(a.Writer, msg)
 		return errors.New(msg)
 	}
 
-	msg = fmt.Sprintf("[agent %d] Registered with slot notifier", a.ID)
+	msg = fmt.Sprintf("[agent %04d] Registered with slot notifier", a.ID)
 	fmt.Fprintln(a.Writer, msg)
 
 	a.waitGroup.Add(1)
@@ -149,13 +149,13 @@ func (a *Agent) Run() error {
 		select {
 		case slot := <-a.SlotQueue:
 			rowIdx := int(slot)
-			msg := fmt.Sprintf("[agent %d] Processing row %d: %v", a.ID, rowIdx, a.Trace[rowIdx])
+			msg := fmt.Sprintf("[agent %04d] Processing row %d: %v", a.ID, rowIdx, a.Trace[rowIdx])
 			fmt.Fprintln(a.Writer, msg)
 
 			select {
 			case a.BuyQueue <- rowIdx:
 			default:
-				msg := fmt.Sprintf("[agent %d] Unable to push row %d to 'buy' queue (size: %d)", a.ID, rowIdx, len(a.BuyQueue))
+				msg := fmt.Sprintf("[agent %04d] Unable to push row %d to 'buy' queue (size: %d)", a.ID, rowIdx, len(a.BuyQueue))
 				fmt.Fprintln(a.Writer, msg)
 				return errors.New(msg)
 			}
@@ -163,7 +163,7 @@ func (a *Agent) Run() error {
 			select {
 			case a.SellQueue <- rowIdx:
 			default:
-				msg := fmt.Sprintf("[agent %d] Unable to push row %d to 'sell' queue (size: %d)", a.ID, rowIdx, len(a.BuyQueue))
+				msg := fmt.Sprintf("[agent %04d] Unable to push row %d to 'sell' queue (size: %d)", a.ID, rowIdx, len(a.BuyQueue))
 				fmt.Fprintln(a.Writer, msg)
 				return errors.New(msg)
 			}
@@ -185,11 +185,11 @@ func (a *Agent) Buy(rowIdx int) error {
 	if row[Use] > 0 {
 		ppu := row[Lo] + (row[Hi]-row[Lo])*(1.0-rand.Float64())
 		bid, _ := json.Marshal([]float64{ppu, row[Use] * ToKWh}) // first arg: PPU, second arg: QTY
-		msg := fmt.Sprintf("[agent %d] Invoking 'buy' for %.3f kWh (%.3f) at %.3f ç/kWh @ slot %d", a.ID, row[Use]*ToKWh, row[Use], ppu, rowIdx)
+		msg := fmt.Sprintf("[agent %04d] Invoking 'buy' for %.3f kWh (%.3f) at %.3f ç/kWh @ slot %d", a.ID, row[Use]*ToKWh, row[Use], ppu, rowIdx)
 		fmt.Fprintln(a.Writer, msg)
 		encBid, err := crypto.Encrypt(bid, a.PubKey)
 		if err != nil {
-			msg := fmt.Sprintf("[agent %d] Unable to encrypt 'buy' for row %d: %s\n", a.ID, rowIdx, err)
+			msg := fmt.Sprintf("[agent %04d] Unable to encrypt 'buy' for row %d: %s\n", a.ID, rowIdx, err)
 			fmt.Fprintln(a.Writer, msg)
 			return errors.New(msg)
 		}
@@ -209,7 +209,7 @@ func (a *Agent) Buy(rowIdx int) error {
 				Status:          err.Error(),
 				LatencyInMillis: elapsed,
 			}
-			msg := fmt.Sprintf("[agent %d] Unable to invoke 'buy' for row %d: %s\n", a.ID, rowIdx, err)
+			msg := fmt.Sprintf("[agent %04d] Unable to invoke 'buy' for row %d: %s\n", a.ID, rowIdx, err)
 			fmt.Fprintln(a.Writer, msg)
 			return errors.New(msg)
 		}
@@ -233,11 +233,11 @@ func (a *Agent) Sell(rowIdx int) error {
 	if row[Gen] > 0 {
 		ppu := row[Lo] + (row[Hi]-row[Lo])*(1.0-rand.Float64())
 		bid, _ := json.Marshal([]float64{ppu, row[Gen] * ToKWh}) // first arg: PPU, second arg: QTY
-		msg := fmt.Sprintf("[agent %d] Invoking 'sell' for %.3f kWh (%.3f) at %.3f ç/kWh @ slot %d", a.ID, row[Gen]*ToKWh, row[Gen], ppu, rowIdx)
+		msg := fmt.Sprintf("[agent %04d] Invoking 'sell' for %.3f kWh (%.3f) at %.3f ç/kWh @ slot %d", a.ID, row[Gen]*ToKWh, row[Gen], ppu, rowIdx)
 		fmt.Fprintln(a.Writer, msg)
 		encBid, err := crypto.Encrypt(bid, a.PubKey)
 		if err != nil {
-			msg := fmt.Sprintf("[agent %d] Unable to encrypt 'sell' for row %d: %s\n", a.ID, rowIdx, err)
+			msg := fmt.Sprintf("[agent %04d] Unable to encrypt 'sell' for row %d: %s\n", a.ID, rowIdx, err)
 			fmt.Fprintln(a.Writer, msg)
 			return errors.New(msg)
 		}
@@ -257,7 +257,7 @@ func (a *Agent) Sell(rowIdx int) error {
 				Status:          err.Error(),
 				LatencyInMillis: elapsed,
 			}
-			msg := fmt.Sprintf("[agent %d] Unable to invoke 'sell' for row %d: %s", a.ID, rowIdx, err)
+			msg := fmt.Sprintf("[agent %04d] Unable to invoke 'sell' for row %d: %s", a.ID, rowIdx, err)
 			fmt.Fprintln(a.Writer, msg)
 			return errors.New(msg)
 		}

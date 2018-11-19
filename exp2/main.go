@@ -91,10 +91,10 @@ func run() error {
 	iter++ // Which iteration is this? Used to name the files we're writing results to.
 	outputprefix = fmt.Sprintf("exp-%02d-run-%02d", ExpNum, iter)
 
-	blocksperslot = 3
-	clockperiod = 500 * time.Millisecond
+	blocksperslot = 5
+	clockperiod = 400 * time.Millisecond
 	sleepduration = 100 * time.Millisecond
-	startfromblock = uint64(10)
+	startfromblock = uint64(10) // Upon the reception of this block, the slot notifier will fire.
 
 	statsblockc = make(chan stats.Block, StatChannelBuffer)
 	statslotc = make(chan stats.Slot, StatChannelBuffer)

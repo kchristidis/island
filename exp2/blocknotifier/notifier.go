@@ -117,7 +117,7 @@ func (n *Notifier) Run() error {
 				fmt.Fprintln(n.Writer, msg)
 				return err
 			}
-			inHeight := resp.BCI.GetHeight()
+			inHeight := resp.BCI.GetHeight() - 1 // ATTN
 
 			// Block stats collector
 			if inHeight > n.MostRecentBlockHeight {
@@ -165,7 +165,7 @@ func (n *Notifier) Run() error {
 
 				n.MostRecentSlot = int(inHeight - n.StartFromBlock) // should be 0
 				n.BlockHeightOfMostRecentSlot = inHeight
-				msg = fmt.Sprintf("[block notifier] Block corresponds to slot %d", n.MostRecentSlot)
+				msg = fmt.Sprintf("[block notifier] Block %d corresponds to slot %d", inHeight, n.MostRecentSlot)
 				fmt.Fprintln(n.Writer, msg)
 				n.SlotChan <- n.MostRecentSlot
 			default: // We're hitting this case only after we've reached StartFromBlock
