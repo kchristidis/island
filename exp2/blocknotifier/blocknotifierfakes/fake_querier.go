@@ -7,7 +7,7 @@ import (
 	ledger "github.com/hyperledger/fabric-sdk-go/pkg/client/ledger"
 	fab "github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 	common "github.com/hyperledger/fabric-sdk-go/third_party/github.com/hyperledger/fabric/protos/common"
-	blocknotifier "github.com/kchristidis/island/blocknotifier"
+	blocknotifier "github.com/kchristidis/island/exp2/blocknotifier"
 )
 
 type FakeQuerier struct {

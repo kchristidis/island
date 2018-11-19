@@ -4,7 +4,7 @@ package markendfakes
 import (
 	sync "sync"
 
-	markend "github.com/kchristidis/island/markend"
+	markend "github.com/kchristidis/island/exp2/markend"
 )
 
 type FakeNotifier struct {

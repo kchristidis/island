@@ -4,7 +4,6 @@ import (
 	"crypto/rsa"
 	"encoding/csv"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -14,15 +13,18 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kchristidis/island/agent"
-	"github.com/kchristidis/island/blockchain"
-	"github.com/kchristidis/island/blocknotifier"
-	"github.com/kchristidis/island/crypto"
-	"github.com/kchristidis/island/markend"
-	"github.com/kchristidis/island/slotnotifier"
-	"github.com/kchristidis/island/stats"
-	"github.com/kchristidis/island/trace"
+	"github.com/kchristidis/island/exp2/agent"
+	"github.com/kchristidis/island/exp2/blockchain"
+	"github.com/kchristidis/island/exp2/blocknotifier"
+	"github.com/kchristidis/island/exp2/crypto"
+	"github.com/kchristidis/island/exp2/markend"
+	"github.com/kchristidis/island/exp2/slotnotifier"
+	"github.com/kchristidis/island/exp2/stats"
+	"github.com/kchristidis/island/exp2/trace"
 )
+
+// ExpNum identifies the experiment number
+const ExpNum = 2
 
 // Constants ...
 const (
@@ -35,11 +37,7 @@ const (
 	OutputBlock = "block.csv"
 )
 
-var exp int
-
 func main() {
-	flag.IntVar(&exp, "exp", 2, "Set to the experiment you wish to simulate.")
-	flag.Parse()
 	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
 		os.Exit(1)
@@ -91,7 +89,7 @@ func run() error {
 	// Global vars
 
 	iter++ // Which iteration is this? Used to name the files we're writing results to.
-	outputprefix = fmt.Sprintf("exp-%02d-run-%02d", exp, iter)
+	outputprefix = fmt.Sprintf("exp-%02d-run-%02d", ExpNum, iter)
 
 	blocksperslot = 3
 	clockperiod = 500 * time.Millisecond
@@ -141,11 +139,11 @@ func run() error {
 
 		OrdererID:   "joe.example.com",
 		ChannelID:   "clark-channel",
-		ChaincodeID: "island",
+		ChaincodeID: fmt.Sprintf("exp%d", ExpNum),
 
-		ChannelConfigPath:   os.Getenv("GOPATH") + "/src/github.com/kchristidis/island/fixtures/artifacts/clark-channel.tx",
+		ChannelConfigPath:   os.Getenv("GOPATH") + "/src/github.com/kchristidis/island/exp2/fixtures/artifacts/clark-channel.tx",
 		ChaincodeGoPath:     os.Getenv("GOPATH"),
-		ChaincodeSourcePath: "github.com/kchristidis/island/chaincode/",
+		ChaincodeSourcePath: "github.com/kchristidis/island/exp2/chaincode/",
 	}
 
 	if err = sdkctx.Setup(); err != nil {

@@ -12,10 +12,12 @@
 
 # Vendor
 vendor/*
+exp*/vendor*
 
 # OS-specific
 .DS_Store
+exp*/.DS_Store
 
 # Final binary and results
 island
-output/*
+exp*/output/*

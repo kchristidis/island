@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kchristidis/island/crypto"
-	"github.com/kchristidis/island/stats"
+	"github.com/kchristidis/island/exp2/crypto"
+	"github.com/kchristidis/island/exp2/stats"
 )
 
 // BufferLen ...

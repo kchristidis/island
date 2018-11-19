@@ -4,7 +4,7 @@ package agentfakes
 import (
 	sync "sync"
 
-	agent "github.com/kchristidis/island/agent"
+	agent "github.com/kchristidis/island/exp2/agent"
 )
 
 type FakeNotifier struct {
