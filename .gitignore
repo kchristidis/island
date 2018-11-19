@@ -18,6 +18,7 @@ exp*/vendor*
 .DS_Store
 exp*/.DS_Store
 
-# Final binary and results
-island
+# Binary, trace files, results
+exp*/exp*
 exp*/output/*
+exp*/trace/*.csv
