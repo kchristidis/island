@@ -16,10 +16,10 @@ import (
 
 // Constants ...
 const (
-	MarkEnd    string = "markEnd"
+	MarkEnd    string = "markEnd" // The allowed values for Regulator Type.
 	RevealKeys string = "revealKeys"
 
-	BufferLen = 100
+	BufferLen = 100 // The buffer for the slot and task channels.
 )
 
 // Invoker ...
@@ -40,7 +40,7 @@ type Regulator struct {
 	Notifier Notifier
 
 	ID           int
-	Type         string // Allowed values:  MarkEnd, RevealKeys
+	Type         string // Allowed values: MarkEnd, RevealKeys
 	PrivKeyBytes []byte
 
 	SlotChan        chan stats.Slot        // Used to feed the stats collector.
