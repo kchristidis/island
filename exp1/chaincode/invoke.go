@@ -14,6 +14,8 @@ func (oc *opContext) invoke() pp.Response {
 		return oc.bid()
 	case "markEnd":
 		return oc.markEnd()
+	case "revealKeys":
+		return oc.revealKeys()
 	case "clock":
 		return oc.clock()
 	default:

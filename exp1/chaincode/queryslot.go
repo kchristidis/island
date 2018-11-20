@@ -9,6 +9,7 @@ import (
 	pp "github.com/hyperledger/fabric/protos/peer"
 )
 
+// Returns a marshalled slice of strings.
 func (oc *opContext) querySlot() pp.Response {
 	key := []string{oc.slot, string(oc.action)} // The partial composite key is: slot_number + action
 	iter, err := oc.stub.GetStateByPartialCompositeKey("", key)
@@ -25,7 +26,8 @@ func (oc *opContext) querySlot() pp.Response {
 		return shim.Error(msg)
 	}
 
-	var resp []string
+	var resp []string // This is the response structure. It will be marshalled before it's returned.
+
 	for iter.HasNext() {
 		respRange, err := iter.Next()
 		if err != nil {

@@ -2,29 +2,26 @@ package main
 
 import (
 	"crypto/rsa"
-	"sync"
 )
 
 // Constants ...
 const (
-	TraceLength  = 35036
-	BufferLen    = 20
+	TraceLength  = 35036 // Used for sizing aggregateStats below.
 	EnableEvents = false
 )
 
+// Populated during bidding. Returned on an aggregate query.
 type aggregateStats struct {
 	LateTXsCount, LateBuysCount, LateSellsCount [TraceLength]int
 	// lateDecryptsCount [TraceLength]int
 	// duplTXsCount, duplBuysCount, duplSellsCount [TraceLength]int
 }
 
-var (
-	buyerBids, sellerBids map[int]BidCollection
-	bbMutex, sbMutex      sync.RWMutex
-	aggStats              aggregateStats
-)
+// A singleton that gets populated with metrics
+// during the lifecycle of the chaincode.
+var aggStats aggregateStats
 
-// Keys
+// Keys -- see N.B. in main.go
 var keyPair *rsa.PrivateKey
 var privBytes = []byte(`
 -----BEGIN RSA PRIVATE KEY-----

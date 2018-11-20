@@ -14,7 +14,7 @@ func main() {
 	}
 }
 
-// contract satisfies the shim.Chaincode interface so that it is a valid Fabric contract.
+// contract satisfies the shim.Chaincode interface so that it is a valid Fabric chaincode.
 type contract struct{}
 
 // Init carries initialization logic for the chaincode. It is automatically invoked during chaincode instantiation.
@@ -24,9 +24,11 @@ func (c *contract) Init(stub shim.ChaincodeStubInterface) pp.Response {
 	buyerBids = make(map[int]BidCollection)
 	sellerBids = make(map[int]BidCollection)
 
+	// N.B. For the purposes of this POC, we persist the private key in
+	// the chaincode itself. This is of course a huge no-no in production.
 	keyPair, err = DeserializePrivate(privBytes)
 	if err != nil {
-		msg := fmt.Sprintf("[Cannot load keypair: %s", err.Error())
+		msg := fmt.Sprintf("Cannot load keypair: %s", err.Error())
 		fmt.Fprintln(os.Stdout, msg)
 		return shim.Error(msg)
 	}

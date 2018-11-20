@@ -32,10 +32,14 @@ func newOpContext(stub shim.ChaincodeStubInterface) (*opContext, error) {
 		data:    args[4],
 	}
 
+	var msg string
+
 	switch oc.action {
-	case "buy", "sell", "markEnd":
-		msg := fmt.Sprintf("[%s] Action '%s' @ slot '%s'", oc.txID, oc.action, oc.slot)
+	case "buy", "sell", "markEnd", "revealKeys":
+		msg = fmt.Sprintf("[%s] Action '%s' @ slot '%s'", oc.txID, oc.action, oc.slot)
 		fmt.Fprintln(os.Stdout, msg)
+	default:
+		// Do not error on other actions, as they may correspond to valid queries.
 	}
 
 	return oc, nil
