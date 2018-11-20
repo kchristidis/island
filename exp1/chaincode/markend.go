@@ -25,6 +25,12 @@ func (oc *opContext) markEnd() pp.Response {
 		PPU, Units float64
 	}
 
+	// ATTN: In a non-POC setting, we would persist this key to the ledger, and
+	// have the clients do the decryption and calculate the clearing price locally.
+	// In this POC we persist the key to the ledger, but also perform the MCP
+	// calculations on the chaincode.
+	writeVal.PrivKey = string(oc.data)
+
 	// This is what we return to the caller.
 	var respVal struct {
 		Msg        string
@@ -85,8 +91,6 @@ func (oc *opContext) markEnd() pp.Response {
 		respVal.Msg = msg
 		respVal.Slot = slotNum
 	}
-
-	writeVal.PrivKey = string(oc.data)
 
 	writeBytes, err := json.Marshal(writeVal)
 	if err != nil {
