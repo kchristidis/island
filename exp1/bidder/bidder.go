@@ -1,4 +1,4 @@
-package agent
+package bidder
 
 import (
 	"crypto/rsa"
@@ -15,22 +15,16 @@ import (
 	"github.com/kchristidis/island/exp1/stats"
 )
 
-// BufferLen ...
-const BufferLen = 100
-
-// Delta ...
-const Delta = 0.0001
-
-// ToKWh ...
-const ToKWh = 0.25
-
-// Column names ...
+// Constants ...
 const (
-	Gen = iota
+	Gen = iota // The column names in the trace
 	Grid
 	Use
 	Lo
 	Hi
+
+	BufferLen = 100  // The buffer for the slot and task channels
+	ToKWh     = 0.25 // Used to convert the trace values into KWh
 )
 
 // Invoker ...
@@ -45,8 +39,8 @@ type Notifier interface {
 	Register(id int, queue chan int) bool
 }
 
-// Agent ...
-type Agent struct {
+// Bidder ...
+type Bidder struct {
 	Invoker  Invoker
 	Notifier Notifier
 
@@ -57,7 +51,7 @@ type Agent struct {
 	SlotChan        chan stats.Slot        // Used to feed the stats collector.
 	TransactionChan chan stats.Transaction // Used to feed the stats collector.
 
-	SlotQueue chan int // The agent's trigger/input — an agent acts whenever a new slot is pushed through this channel.
+	SlotQueue chan int // The bidder's trigger/input — a bidder acts whenever a new slot is pushed through this channel.
 	BuyQueue  chan int // Used to decouple bids from the main thread.
 	SellQueue chan int // As above.
 
@@ -72,8 +66,8 @@ type Agent struct {
 func New(invoker Invoker, notifier Notifier,
 	pubkey *rsa.PublicKey, trace [][]float64, id int,
 	slotc chan stats.Slot, transactionc chan stats.Transaction,
-	writer io.Writer, donec chan struct{}) *Agent {
-	return &Agent{
+	writer io.Writer, donec chan struct{}) *Bidder {
+	return &Bidder{
 		Invoker:  invoker,
 		Notifier: notifier,
 
@@ -97,49 +91,49 @@ func New(invoker Invoker, notifier Notifier,
 }
 
 // Run ...
-func (a *Agent) Run() error {
-	msg := fmt.Sprintf("[agent %04d] Exited", a.ID)
-	defer fmt.Fprintln(a.Writer, msg)
+func (b *Bidder) Run() error {
+	msg := fmt.Sprintf("[bidder %04d] Exited", b.ID)
+	defer fmt.Fprintln(b.Writer, msg)
 
 	defer func() {
-		close(a.killChan)
-		a.waitGroup.Wait()
+		close(b.killChan)
+		b.waitGroup.Wait()
 	}()
 
-	if ok := a.Notifier.Register(a.ID, a.SlotQueue); !ok {
-		msg := fmt.Sprintf("[agent %04d] Unable to register with slot notifier", a.ID)
-		fmt.Fprintln(a.Writer, msg)
+	if ok := b.Notifier.Register(b.ID, b.SlotQueue); !ok {
+		msg := fmt.Sprintf("[bidder %04d] Unable to register with slot notifier", b.ID)
+		fmt.Fprintln(b.Writer, msg)
 		return errors.New(msg)
 	}
 
-	msg = fmt.Sprintf("[agent %04d] Registered with slot notifier", a.ID)
-	fmt.Fprintln(a.Writer, msg)
+	msg = fmt.Sprintf("[bidder %04d] Registered with slot notifier", b.ID)
+	fmt.Fprintln(b.Writer, msg)
 
-	a.waitGroup.Add(1)
+	b.waitGroup.Add(1)
 	go func() {
-		defer a.waitGroup.Done()
+		defer b.waitGroup.Done()
 		for {
 			select {
-			case <-a.killChan:
+			case <-b.killChan:
 				return
-			case rowIdx := <-a.BuyQueue:
-				a.Buy(rowIdx)
-			case <-a.DoneChan:
+			case rowIdx := <-b.BuyQueue:
+				b.Buy(rowIdx)
+			case <-b.DoneChan:
 				return
 			}
 		}
 	}()
 
-	a.waitGroup.Add(1)
+	b.waitGroup.Add(1)
 	go func() {
-		defer a.waitGroup.Done()
+		defer b.waitGroup.Done()
 		for {
 			select {
-			case <-a.killChan:
+			case <-b.killChan:
 				return
-			case rowIdx := <-a.SellQueue:
-				a.Sell(rowIdx)
-			case <-a.DoneChan:
+			case rowIdx := <-b.SellQueue:
+				b.Sell(rowIdx)
+			case <-b.DoneChan:
 				return
 			}
 		}
@@ -147,76 +141,82 @@ func (a *Agent) Run() error {
 
 	for {
 		select {
-		case slot := <-a.SlotQueue:
+		case slot := <-b.SlotQueue:
 			rowIdx := int(slot)
-			msg := fmt.Sprintf("[agent %04d] Processing row %d: %v", a.ID, rowIdx, a.Trace[rowIdx])
-			fmt.Fprintln(a.Writer, msg)
+			msg := fmt.Sprintf("[bidder %04d] Got notified that slot %d has arrived - processing row %d: %v",
+				b.ID, slot, rowIdx, b.Trace[rowIdx])
+			fmt.Fprintln(b.Writer, msg)
 
 			select {
-			case a.BuyQueue <- rowIdx:
+			case b.BuyQueue <- rowIdx:
 			default:
-				msg := fmt.Sprintf("[agent %04d] Unable to push row %d to 'buy' queue (size: %d)", a.ID, rowIdx, len(a.BuyQueue))
-				fmt.Fprintln(a.Writer, msg)
+				msg := fmt.Sprintf("[bidder %04d] Unable to push row %d to 'buy' queue (size: %d)",
+					b.ID, rowIdx, len(b.BuyQueue))
+				fmt.Fprintln(b.Writer, msg)
 				return errors.New(msg)
 			}
 
 			select {
-			case a.SellQueue <- rowIdx:
+			case b.SellQueue <- rowIdx:
 			default:
-				msg := fmt.Sprintf("[agent %04d] Unable to push row %d to 'sell' queue (size: %d)", a.ID, rowIdx, len(a.BuyQueue))
-				fmt.Fprintln(a.Writer, msg)
+				msg := fmt.Sprintf("[bidder %04d] Unable to push row %d to 'sell' queue (size: %d)",
+					b.ID, rowIdx, len(b.BuyQueue))
+				fmt.Fprintln(b.Writer, msg)
 				return errors.New(msg)
 			}
 
 			// Return when you're done processing your trace
-			if rowIdx == len(a.Trace)-1 {
+			if rowIdx == len(b.Trace)-1 {
 				return nil
 			}
-		case <-a.DoneChan:
+		case <-b.DoneChan:
 			return nil
 		}
 	}
 }
 
 // Buy ...
-func (a *Agent) Buy(rowIdx int) error {
-	row := a.Trace[rowIdx]
+func (b *Bidder) Buy(rowIdx int) error {
+	row := b.Trace[rowIdx]
 	txID := strconv.Itoa(rand.Intn(1E6))
 	if row[Use] > 0 {
 		ppu := row[Lo] + (row[Hi]-row[Lo])*(1.0-rand.Float64())
-		bid, _ := json.Marshal([]float64{ppu, row[Use] * ToKWh}) // first arg: PPU, second arg: QTY
-		msg := fmt.Sprintf("[agent %04d] Invoking 'buy' for %.3f kWh (%.3f) at %.3f ç/kWh @ slot %d", a.ID, row[Use]*ToKWh, row[Use], ppu, rowIdx)
-		fmt.Fprintln(a.Writer, msg)
-		encBid, err := crypto.Encrypt(bid, a.PubKey)
+		bid, _ := json.Marshal([]float64{ppu, row[Use] * ToKWh}) // First arg: PPU, second arg: QTY
+		msg := fmt.Sprintf("[bidder %04d] Invoking 'buy' for %.3f kWh (%.3f) at %.3f ç/kWh @ slot %d",
+			b.ID, row[Use]*ToKWh, row[Use], ppu, rowIdx)
+		fmt.Fprintln(b.Writer, msg)
+		encBid, err := crypto.Encrypt(bid, b.PubKey)
 		if err != nil {
-			msg := fmt.Sprintf("[agent %04d] Unable to encrypt 'buy' for row %d: %s\n", a.ID, rowIdx, err)
-			fmt.Fprintln(a.Writer, msg)
+			msg := fmt.Sprintf("[bidder %04d] Unable to encrypt 'buy' for row %d: %s\n",
+				b.ID, rowIdx, err)
+			fmt.Fprintln(b.Writer, msg)
 			return errors.New(msg)
 		}
-		a.SlotChan <- stats.Slot{
+		b.SlotChan <- stats.Slot{
 			Number:    rowIdx,
 			EnergyUse: row[Use] * ToKWh,
 			PricePaid: row[Hi],
 		}
 		timeStart := time.Now()
-		if _, err := a.Invoker.Invoke(txID, rowIdx, "buy", encBid); err != nil {
+		if _, err := b.Invoker.Invoke(txID, rowIdx, "buy", encBid); err != nil {
 			// Update stats
 			timeEnd := time.Now()
 			elapsed := int64(timeEnd.Sub(timeStart) / time.Millisecond)
-			a.TransactionChan <- stats.Transaction{
+			b.TransactionChan <- stats.Transaction{
 				ID:              txID,
 				Type:            "buy",
 				Status:          err.Error(),
 				LatencyInMillis: elapsed,
 			}
-			msg := fmt.Sprintf("[agent %04d] Unable to invoke 'buy' for row %d: %s\n", a.ID, rowIdx, err)
-			fmt.Fprintln(a.Writer, msg)
+			msg := fmt.Sprintf("[bidder %04d] Unable to invoke 'buy' for row %d: %s\n",
+				b.ID, rowIdx, err)
+			fmt.Fprintln(b.Writer, msg)
 			return errors.New(msg)
 		}
 		// Update stats
 		timeEnd := time.Now()
 		elapsed := int64(timeEnd.Sub(timeStart) / time.Millisecond)
-		a.TransactionChan <- stats.Transaction{
+		b.TransactionChan <- stats.Transaction{
 			ID:              txID,
 			Type:            "buy",
 			Status:          "success",
@@ -227,44 +227,47 @@ func (a *Agent) Buy(rowIdx int) error {
 }
 
 // Sell ...
-func (a *Agent) Sell(rowIdx int) error {
+func (b *Bidder) Sell(rowIdx int) error {
 	txID := strconv.Itoa(rand.Intn(1E6))
-	row := a.Trace[rowIdx]
+	row := b.Trace[rowIdx]
 	if row[Gen] > 0 {
 		ppu := row[Lo] + (row[Hi]-row[Lo])*(1.0-rand.Float64())
-		bid, _ := json.Marshal([]float64{ppu, row[Gen] * ToKWh}) // first arg: PPU, second arg: QTY
-		msg := fmt.Sprintf("[agent %04d] Invoking 'sell' for %.3f kWh (%.3f) at %.3f ç/kWh @ slot %d", a.ID, row[Gen]*ToKWh, row[Gen], ppu, rowIdx)
-		fmt.Fprintln(a.Writer, msg)
-		encBid, err := crypto.Encrypt(bid, a.PubKey)
+		bid, _ := json.Marshal([]float64{ppu, row[Gen] * ToKWh}) // First arg: PPU, second arg: QTY
+		msg := fmt.Sprintf("[bidder %04d] Invoking 'sell' for %.3f kWh (%.3f) at %.3f ç/kWh @ slot %d",
+			b.ID, row[Gen]*ToKWh, row[Gen], ppu, rowIdx)
+		fmt.Fprintln(b.Writer, msg)
+		encBid, err := crypto.Encrypt(bid, b.PubKey)
 		if err != nil {
-			msg := fmt.Sprintf("[agent %04d] Unable to encrypt 'sell' for row %d: %s\n", a.ID, rowIdx, err)
-			fmt.Fprintln(a.Writer, msg)
+			msg := fmt.Sprintf("[bidder %04d] Unable to encrypt 'sell' for row %d: %s\n",
+				b.ID, rowIdx, err)
+			fmt.Fprintln(b.Writer, msg)
 			return errors.New(msg)
 		}
-		a.SlotChan <- stats.Slot{
+		b.SlotChan <- stats.Slot{
 			Number:    rowIdx,
 			EnergyGen: row[Gen] * ToKWh,
 			PriceSold: row[Lo],
 		}
 		timeStart := time.Now()
-		if _, err := a.Invoker.Invoke(txID, rowIdx, "sell", encBid); err != nil {
+		if _, err := b.Invoker.Invoke(txID, rowIdx, "sell", encBid); err != nil {
 			// Update stats
 			timeEnd := time.Now()
 			elapsed := int64(timeEnd.Sub(timeStart) / time.Millisecond)
-			a.TransactionChan <- stats.Transaction{
+			b.TransactionChan <- stats.Transaction{
 				ID:              txID,
 				Type:            "sell",
 				Status:          err.Error(),
 				LatencyInMillis: elapsed,
 			}
-			msg := fmt.Sprintf("[agent %04d] Unable to invoke 'sell' for row %d: %s", a.ID, rowIdx, err)
-			fmt.Fprintln(a.Writer, msg)
+			msg := fmt.Sprintf("[bidder %04d] Unable to invoke 'sell' for row %d: %s",
+				b.ID, rowIdx, err)
+			fmt.Fprintln(b.Writer, msg)
 			return errors.New(msg)
 		}
 		// Update stats
 		timeEnd := time.Now()
 		elapsed := int64(timeEnd.Sub(timeStart) / time.Millisecond)
-		a.TransactionChan <- stats.Transaction{
+		b.TransactionChan <- stats.Transaction{
 			ID:              txID,
 			Type:            "sell",
 			Status:          "success",
