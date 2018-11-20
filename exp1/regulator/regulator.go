@@ -34,6 +34,13 @@ type Notifier interface {
 	Register(id int, queue chan int) bool
 }
 
+// This is the schema we expect from the markEnd response.
+type respBlob struct {
+	Message    string
+	Slot       int
+	PPU, Units float64
+}
+
 // Regulator ...
 type Regulator struct {
 	Invoker  Invoker
@@ -152,20 +159,14 @@ func (r *Regulator) Run() error {
 
 					switch r.Type {
 					case MarkEnd:
-						// This is the schema we expect from the markEnd response.
-						var respVal struct {
-							Msg        string
-							Slot       int
-							PPU, Units float64
-						}
-
+						var respVal respBlob
 						if err := json.Unmarshal(resp, &respVal); err != nil {
 							msg := fmt.Sprintf("[%s] Cannot unmarshal returned response: %s", txID, err.Error())
 							fmt.Fprintln(os.Stdout, msg)
 							r.ErrChan <- errors.New(msg)
 						}
 
-						msg := fmt.Sprintf("[regulator %s-%02d] Invocation response:\n\t%s\n", r.Type, r.ID, respVal.Msg)
+						msg := fmt.Sprintf("[regulator %s-%02d] Invocation response:\n\t%s\n", r.Type, r.ID, respVal.Message)
 						fmt.Fprintf(r.Writer, msg)
 						if slot > -1 { // The markEnd call @ -1 is useless.
 							r.SlotChan <- stats.Slot{
