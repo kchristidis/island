@@ -7,13 +7,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/kchristidis/island/exp1/crypto"
 	"github.com/kchristidis/island/exp1/regulator"
 	"github.com/kchristidis/island/exp1/regulator/regulatorfakes"
 	"github.com/kchristidis/island/exp1/stats"
 	"github.com/onsi/gomega/gbytes"
+	"github.com/stretchr/testify/require"
 
 	. "github.com/onsi/gomega"
 )
@@ -24,7 +23,7 @@ type resp struct {
 	ppu, units float64
 }
 
-func TestAgent(t *testing.T) {
+func TestRegulator(t *testing.T) {
 	g := NewGomegaWithT(t)
 
 	id := 1
