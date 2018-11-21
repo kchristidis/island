@@ -17,7 +17,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-type resp struct {
+type respBlob struct {
 	msg        string
 	slot       int
 	ppu, units float64
@@ -42,7 +42,7 @@ func TestRegulator(t *testing.T) {
 		slotnotifier := new(regulatorfakes.FakeNotifier)
 		slotnotifier.RegisterReturns(false)
 
-		types := []string{regulator.MarkEnd, regulator.RevealKeys}
+		types := []string{"markend"}
 
 		for _, regType := range types {
 			bfr := gbytes.NewBuffer()
@@ -77,7 +77,7 @@ func TestRegulator(t *testing.T) {
 		slotnotifier := new(regulatorfakes.FakeNotifier)
 		slotnotifier.RegisterReturns(true)
 
-		types := []string{regulator.MarkEnd, regulator.RevealKeys}
+		types := []string{"markend"}
 
 		for _, regType := range types {
 			bfr := gbytes.NewBuffer()
@@ -108,16 +108,16 @@ func TestRegulator(t *testing.T) {
 	t.Run("notifier works fine", func(t *testing.T) {
 		invoker := new(regulatorfakes.FakeInvoker)
 		slot := 5
-		respVal := resp{
+		respVal := respBlob{
 			slot: slot,
 		}
-		respB, _ := json.Marshal(respVal)
-		invoker.InvokeReturns(respB, nil)
+		respValB, _ := json.Marshal(respVal)
+		invoker.InvokeReturns(respValB, nil)
 
 		slotnotifier := new(regulatorfakes.FakeNotifier)
 		slotnotifier.RegisterReturns(true)
 
-		types := []string{regulator.MarkEnd, regulator.RevealKeys}
+		types := []string{"markend"}
 
 		for _, regType := range types {
 			bfr := gbytes.NewBuffer()
@@ -143,12 +143,12 @@ func TestRegulator(t *testing.T) {
 			g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say(fmt.Sprintf("Invoking @ slot %d", slot)))
 
 			switch r.Type {
-			case regulator.MarkEnd:
+			case "markend":
 				g.Eventually(func() int {
 					_, slot, _, _ := invoker.InvokeArgsForCall(0)
 					return slot
 				}, "1s", "50ms").Should(Equal(slot - 1))
-			case regulator.RevealKeys:
+			default:
 				g.Eventually(func() int {
 					_, slot, _, _ := invoker.InvokeArgsForCall(1)
 					return slot
@@ -171,7 +171,7 @@ func TestRegulator(t *testing.T) {
 
 		slot := 5
 
-		types := []string{regulator.MarkEnd, regulator.RevealKeys}
+		types := []string{"markend"}
 
 		for _, regType := range types {
 			bfr := gbytes.NewBuffer()
@@ -209,7 +209,7 @@ func TestRegulator(t *testing.T) {
 
 		slot := 5
 
-		types := []string{regulator.MarkEnd, regulator.RevealKeys}
+		types := []string{"markend"}
 
 		for _, regType := range types {
 			bfr := gbytes.NewBuffer()

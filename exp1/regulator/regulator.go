@@ -14,13 +14,8 @@ import (
 	"github.com/kchristidis/island/exp1/stats"
 )
 
-// Constants ...
-const (
-	MarkEnd    string = "markEnd" // The allowed values for Regulator Type.
-	RevealKeys string = "revealKeys"
-
-	BufferLen = 100 // The buffer for the slot and task channels.
-)
+// BufferLen dictates the buffer length for the slot and task channels.
+const BufferLen = 100
 
 // Invoker ...
 //go:generate counterfeiter . Invoker
@@ -47,7 +42,7 @@ type Regulator struct {
 	Notifier Notifier
 
 	ID           int
-	Type         string // Allowed values: MarkEnd, RevealKeys
+	Type         string // For now this value is fixed to: markend
 	PrivKeyBytes []byte
 
 	SlotChan        chan stats.Slot        // Used to feed the stats collector.
@@ -75,7 +70,7 @@ func New(
 		Notifier: slotnotifier,
 
 		ID:           id,
-		Type:         regType,
+		Type:         "markend",
 		PrivKeyBytes: privKeyBytes,
 
 		SlotChan:        slotc,
@@ -127,12 +122,11 @@ func (r *Regulator) Run() error {
 				var resp []byte
 				var err error
 				switch r.Type {
-				case MarkEnd:
+				case "markend":
 					// We decrement the slot number because a markEnd call
 					// @ slot N is supposed to mark the end of slot N.
 					resp, err = r.Invoker.Invoke(txID, slot-1, r.Type, r.PrivKeyBytes)
-				case RevealKeys:
-					resp, err = r.Invoker.Invoke(txID, slot, r.Type, r.PrivKeyBytes)
+				default:
 				}
 				if err != nil {
 					msg := fmt.Sprintf("[regulator %s-%02d] Unable to invoke @ slot %d: %s\n", r.Type, r.ID, slot, err)
@@ -158,7 +152,7 @@ func (r *Regulator) Run() error {
 					}
 
 					switch r.Type {
-					case MarkEnd:
+					case "markend":
 						var respVal respBlob
 						if err := json.Unmarshal(resp, &respVal); err != nil {
 							msg := fmt.Sprintf("[%s] Cannot unmarshal returned response: %s", txID, err.Error())
@@ -175,7 +169,7 @@ func (r *Regulator) Run() error {
 								PriceTraded:  respVal.PPU,
 							}
 						}
-					case RevealKeys:
+					default:
 					}
 
 				}
