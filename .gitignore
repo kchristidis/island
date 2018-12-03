@@ -12,13 +12,11 @@
 
 # Vendor
 vendor/*
-exp*/vendor*
 
 # OS-specific
 .DS_Store
-exp*/.DS_Store
 
 # Binary, trace files, results
-exp*/exp*
-exp*/output/*
-exp*/trace/*.csv
+island
+output/*
+trace/*.csv

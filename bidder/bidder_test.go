@@ -1,0 +1,127 @@
+package bidder_test
+
+import (
+	"fmt"
+	"path/filepath"
+	"testing"
+
+	"github.com/kchristidis/island/bidder"
+	"github.com/kchristidis/island/bidder/bidderfakes"
+	"github.com/kchristidis/island/crypto"
+	"github.com/kchristidis/island/stats"
+	"github.com/kchristidis/island/trace"
+	"github.com/onsi/gomega/gbytes"
+	"github.com/stretchr/testify/require"
+
+	. "github.com/onsi/gomega"
+)
+
+func TestBidder(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	path := filepath.Join("..", "trace", trace.Filename)
+	m, err := trace.Load(path)
+	require.NoError(t, err)
+
+	privkeypath := filepath.Join("..", "crypto", "priv.pem")
+	privkey, err := crypto.LoadPrivate(privkeypath)
+	require.NoError(t, err)
+	privkeybytes := crypto.SerializePrivate(privkey)
+
+	slotc := make(chan stats.Slot, 10)               // A large enough buffer so that we don't have to worry about draining it.
+	transactionc := make(chan stats.Transaction, 10) // A large enough buffer so that we don't have to worry about draining it.
+
+	t.Run("notifier registration fails", func(t *testing.T) {
+		invoker := new(bidderfakes.FakeInvoker)
+
+		slotnotifier0 := new(bidderfakes.FakeNotifier)
+		slotnotifier0.RegisterReturns(false)
+		slotnotifiers := []bidder.Notifier{slotnotifier0}
+
+		bfr := gbytes.NewBuffer()
+		donec := make(chan struct{})
+
+		b := bidder.New(invoker, slotnotifiers[0], nil, trace.IDs[0], privkeybytes, m[trace.IDs[0]], slotc, transactionc, bfr, donec)
+
+		var err error
+		deadc := make(chan struct{})
+		go func() {
+			err = b.Run()
+			close(deadc)
+		}()
+
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Unable to register with slot notifier"))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Exited"))
+
+		close(donec)
+		<-deadc
+		g.Expect(err).To(HaveOccurred())
+	})
+
+	t.Run("done chan closes", func(t *testing.T) {
+		invoker := new(bidderfakes.FakeInvoker)
+
+		slotnotifier0 := new(bidderfakes.FakeNotifier)
+		slotnotifier0.RegisterReturns(true)
+		slotnotifiers := []bidder.Notifier{slotnotifier0}
+
+		bfr := gbytes.NewBuffer()
+		donec := make(chan struct{})
+
+		b := bidder.New(invoker, slotnotifiers[0], nil, trace.IDs[0], privkeybytes, m[trace.IDs[0]], slotc, transactionc, bfr, donec)
+
+		var err error
+		deadc := make(chan struct{})
+		go func() {
+			err = b.Run()
+			close(deadc)
+		}()
+
+		close(donec)
+		<-deadc
+
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Exited"))
+		g.Expect(err).ToNot(HaveOccurred())
+	})
+
+	t.Run("notifier works fine", func(t *testing.T) {
+		invoker := new(bidderfakes.FakeInvoker)
+
+		slotnotifier0 := new(bidderfakes.FakeNotifier)
+		slotnotifier0.RegisterReturns(true)
+		slotnotifiers := []bidder.Notifier{slotnotifier0}
+
+		slot := 1
+
+		bfr := gbytes.NewBuffer()
+		donec := make(chan struct{})
+
+		b := bidder.New(invoker, slotnotifiers[0], nil, trace.IDs[0], privkeybytes, m[trace.IDs[0]], slotc, transactionc, bfr, donec)
+
+		// var err error
+		deadc := make(chan struct{})
+		go func() {
+			err = b.Run()
+			close(deadc)
+		}()
+
+		invoker.InvokeReturns(nil, nil)
+		b.SlotQueues[0] <- slot
+
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say(fmt.Sprintf("slot %d has arrived", slot)))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Invoking 'buy' for"))
+
+		/* invoker.InvokeReturns(nil, errors.New("foo"))
+		b.SlotQueue <- slot + 1
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Unable to invoke 'buy' for"))
+
+		b.BuyQueue = nil
+		b.SlotQueue <- slot + 1
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say(fmt.Sprintf("Unable to push row %d to 'buy' queue", slot+1+1))) */
+
+		close(donec)
+		<-deadc
+
+		// g.Expect(err).To(HaveOccurred())
+	})
+}

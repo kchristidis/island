@@ -1,0 +1,73 @@
+client:
+  organization: clark
+  logging:
+    level: info
+  cryptoconfig:
+    path: ${GOPATH}/src/github.com/kchristidis/island/fixtures/crypto-config
+  credentialStore:
+    path: /tmp/island
+  BCCSP:
+    security:
+     enabled: true
+     default:
+      provider: "SW"
+     hashAlgorithm: "SHA2"
+     softVerify: true
+     level: 256
+
+channels:
+  clark-channel:
+    peers:
+      peer0.clark.example.com:
+        endorsingPeer: true
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
+
+organizations:
+  clark:
+    mspid: clark.example.com
+    cryptoPath: peerOrganizations/clark.example.com/users/{userName}@clark.example.com/msp
+    peers:
+      - peer0.clark.example.com
+    certificateAuthorities:
+
+orderers:
+  joe.example.com:
+    url: localhost:7050
+    grpcOptions:
+      ssl-target-name-override: joe.example.com
+      keep-alive-time: 0s
+      keep-alive-timeout: 20s
+      keep-alive-permit: false
+      fail-fast: false
+      allow-insecure: false
+    tlsCACerts:
+      path: ${GOPATH}/src/github.com/kchristidis/island/fixtures/crypto-config/ordererOrganizations/example.com/tlsca/tlsca.example.com-cert.pem
+
+peers:
+  peer0.clark.example.com:
+    url: localhost:7051
+    eventUrl: localhost:7053
+    grpcOptions:
+      ssl-target-name-override: peer0.clark.example.com
+      keep-alive-time: 0s
+      keep-alive-timeout: 20s
+      keep-alive-permit: false
+      fail-fast: false
+      allow-insecure: false
+    tlsCACerts:
+      path: ${GOPATH}/src/github.com/kchristidis/island/fixtures/crypto-config/peerOrganizations/clark.example.com/tlsca/tlsca.clark.example.com-cert.pem
+
+entityMatchers:
+  peer:
+    - pattern: (\w*)peer0.clark.example.com(\w*)
+      urlSubstitutionExp: localhost:7051
+      eventUrlSubstitutionExp: localhost:7053
+      sslTargetOverrideUrlSubstitutionExp: peer0.clark.example.com
+      mappedHost: peer0.clark.example.com
+  orderer:
+    - pattern: (\w*)joe.example.com(\w*)
+      urlSubstitutionExp: localhost:7050
+      sslTargetOverrideUrlSubstitutionExp: joe.example.com
+      mappedHost: joe.example.com
