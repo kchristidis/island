@@ -38,7 +38,7 @@ func metrics() error {
 	defer tranfile.Close()
 
 	tranwriter := csv.NewWriter(tranfile)
-	if err := tranwriter.Write([]string{"tx ID", "latency (ms)", "tx type", "tx status"}); err != nil {
+	if err := tranwriter.Write([]string{"tx_id", "latency_ms", "tx_type", "attempt", "tx_status"}); err != nil {
 		return err
 	}
 	defer func() error {
@@ -56,7 +56,7 @@ func metrics() error {
 	defer blockfile.Close()
 
 	blockwriter := csv.NewWriter(blockfile)
-	if err := blockwriter.Write([]string{"block num", "filesize (KiB)"}); err != nil {
+	if err := blockwriter.Write([]string{"block_num", "size_kib"}); err != nil {
 		return err
 	}
 	defer func() error {
@@ -74,15 +74,15 @@ func metrics() error {
 	defer slotfile.Close()
 
 	slotwriter := csv.NewWriter(slotfile)
-	if err := slotwriter.Write([]string{"slot num",
-		"bfg qty (kWh)", "bfg ppu (ç/kWh)", // bfg = bought from grid
-		"stg qty (kWh)", "stg ppu (ç/kWh)", // stg = sold to grid
-		"dmi qty (kWh)", "dmi ppu (ç/kWh)", // dmi = demand met internally
-		"late cnt (all)", "late cnt (buy)", "late cnt (sell)",
-		"late decrs",
-		"prob iters", "prob marshals",
-		"prob decrs", "prob bids",
-		"prob keys", "prob gets", "prob puts"}); err != nil {
+	if err := slotwriter.Write([]string{"slot_num",
+		"bfg_qty_kwh", "bfg_ppu_c_per_kWh)", // bfg = bought from grid
+		"stg_qty_kwh", "stg_ppu_c_per_kWh)", // stg = sold to grid
+		"dmi_qty_kwh", "dmi_ppu_c_per_kWh)", // dmi = demand met internally
+		"late_cnt_all", "late_cnt_buy", "late_cnt_sell",
+		"late_decrs",
+		"prob_iters", "prob_marshals",
+		"prob_decrs", "prob_bids",
+		"prob_keys", "prob_gets", "prob_puts"}); err != nil {
 		return err
 	}
 	defer func() error {
@@ -100,17 +100,20 @@ func metrics() error {
 		idNum, _ := strconv.Atoi(tx.ID)
 		idVal := fmt.Sprintf("%012d", idNum)
 		latVal := fmt.Sprintf("%d", tx.LatencyInMillis)
+		attVal := fmt.Sprintf("%d", tx.Attempt)
 		msg := fmt.Sprintf("[event_id: %s]"+
 			"\tlatency:%s ms"+
 			"\t\ttype:%s"+
+			"\t\tattempt:%s"+
 			"\t\tstatus:%s",
 			idVal,
 			latVal,
 			tx.Type,
+			attVal,
 			tx.Status,
 		)
 		fmt.Fprintln(writer, msg)
-		if err := tranwriter.Write([]string{idVal, latVal, tx.Type, tx.Status}); err != nil {
+		if err := tranwriter.Write([]string{idVal, latVal, tx.Type, attVal, tx.Status}); err != nil {
 			return err
 		}
 	}

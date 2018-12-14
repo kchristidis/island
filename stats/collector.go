@@ -35,6 +35,7 @@ type Transaction struct {
 	Type            string
 	Status          string
 	LatencyInMillis int64
+	Attempt         int
 }
 
 // TransactionStats ...

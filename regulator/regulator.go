@@ -169,7 +169,7 @@ func (r *Regulator) Run() error {
 						Status:          err.Error(),
 						LatencyInMillis: elapsed,
 					}
-					msg := fmt.Sprintf("regulator event_id:%s slot:%012d • cannot invoke 'markEnd': %s\n", eventID, slot, err)
+					msg := fmt.Sprintf("regulator event_id:%s slot:%012d • failure! cannot invoke 'markEnd':\n\t\t%s\n", eventID, slot, err)
 					r.ErrChan <- errors.New(msg)
 				} else {
 					r.TransactionChan <- stats.Transaction{

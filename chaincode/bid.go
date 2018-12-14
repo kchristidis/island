@@ -57,15 +57,7 @@ func (oc *opContext) bid() pp.Response {
 			if err := oc.Unmarshal(valB, &val); err != nil {
 				return shim.Error(err.Error())
 			}
-			// Start debug
-			dbg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • a map exists:\n%+v\n\n", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action, val)
-			fmt.Fprintln(w, dbg)
-			// End debug
 		} else {
-			// Start debug
-			dbg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • a map does not exist", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action)
-			fmt.Fprintln(w, dbg)
-			// End debug
 			val = make(map[string][]byte)
 		}
 		// This is the common path for both cases:
