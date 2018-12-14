@@ -97,7 +97,7 @@ func New(
 
 // Run executes the regulator logic.
 func (r *Regulator) Run() error {
-	msg := fmt.Sprint("[regulator] Exited")
+	msg := fmt.Sprint("regulator • exited")
 	defer fmt.Fprintln(r.Writer, msg)
 
 	defer func() {
@@ -106,12 +106,12 @@ func (r *Regulator) Run() error {
 	}()
 
 	if ok := r.Notifier.Register(-1, r.SlotQueue); !ok {
-		msg := fmt.Sprintf("[regulator] Unable to register with slot notifier")
+		msg := fmt.Sprintf("regulator • cannot register with slot notifier")
 		fmt.Fprintln(r.Writer, msg)
 		return errors.New(msg)
 	}
 
-	msg = fmt.Sprint("[regulator] Registered with slot notifier")
+	msg = fmt.Sprint("regulator • registered with slot notifier")
 	fmt.Fprintln(r.Writer, msg)
 
 	r.waitGroup.Add(1)
@@ -123,15 +123,15 @@ func (r *Regulator) Run() error {
 				return
 			case slot := <-r.TaskQueue:
 				affectedSlot := slot - 1
-				msg := fmt.Sprintf("[regulator] Invoking 'markEnd' @ slot %d for slot %d", slot, affectedSlot)
-				fmt.Fprintln(r.Writer, msg)
+				eventID := strconv.Itoa(rand.Intn(1E12))
 
-				txID := strconv.Itoa(rand.Intn(1E6))
+				msg := fmt.Sprintf("regulator event_id:%s slot:%012d • about to invoke 'markEnd' - note! this will mark the end of slot %012d", eventID, slot, affectedSlot)
+				fmt.Fprintln(r.Writer, msg)
 
 				// We decrement the slot number because a markEnd call
 				// @ slot N is supposed to mark the end of slot N-1.
 				args := schema.OpContextInput{
-					EventID: txID,
+					EventID: eventID,
 					Action:  "markEnd",
 					Slot:    affectedSlot,
 				}
@@ -147,8 +147,7 @@ func (r *Regulator) Run() error {
 					}
 					markEndInputValB, err := json.Marshal(markEndInputVal)
 					if err != nil {
-						msg := fmt.Sprintf("[regulator] Cannot encode 'markEnd' payload @ slot %d for slot %d as a JSON object: %s",
-							slot, affectedSlot, err.Error())
+						msg := fmt.Sprintf("regulator event_id:%s slot:%012d • cannot encode 'markEnd' call to JSON: %s", eventID, slot, err.Error())
 						fmt.Fprintln(r.Writer, msg)
 						continue
 					}
@@ -165,16 +164,16 @@ func (r *Regulator) Run() error {
 
 				if err != nil {
 					r.TransactionChan <- stats.Transaction{
-						ID:              txID,
+						ID:              eventID,
 						Type:            "markEnd",
 						Status:          err.Error(),
 						LatencyInMillis: elapsed,
 					}
-					msg := fmt.Sprintf("[regulator] Unable to invoke @ slot %d: %s\n", slot, err)
+					msg := fmt.Sprintf("regulator event_id:%s slot:%012d • cannot invoke 'markEnd': %s\n", eventID, slot, err)
 					r.ErrChan <- errors.New(msg)
 				} else {
 					r.TransactionChan <- stats.Transaction{
-						ID:              txID,
+						ID:              eventID,
 						Type:            "markEnd",
 						Status:          "success",
 						LatencyInMillis: elapsed,
@@ -182,15 +181,14 @@ func (r *Regulator) Run() error {
 
 					var markendOutputVal schema.MarkEndOutput
 					if err := json.Unmarshal(respB, &markendOutputVal); err != nil {
-						msg := fmt.Sprintf("[regulator] Cannot unmarshal JSON-encoded response associated with tx ID %s: %s",
-							txID, err.Error())
+						msg := fmt.Sprintf("regulator event_id:%s slot:%012d • cannot decode JSON response to 'markEnd' invocation: %s", eventID, slot, err.Error())
 						fmt.Fprintln(r.Writer, msg)
 						r.ErrChan <- errors.New(msg)
 						continue
 					}
 
-					msg := fmt.Sprintf("[regulator] Invocation response:\n\t%s\n", markendOutputVal.Message)
-					fmt.Fprintf(r.Writer, msg)
+					msg := fmt.Sprintf("regulator event_id:%s slot:%012d • invocation response:\n\t\t%s", eventID, slot, markendOutputVal.Message)
+					fmt.Fprintln(r.Writer, msg)
 					if slot > -1 { // The markEnd call @ -1 is useless.
 						r.SlotChan <- stats.Slot{
 							Number:       affectedSlot, // ATTN: markEnd @ slot N clears the market @ slot N-1.
@@ -212,18 +210,17 @@ func (r *Regulator) Run() error {
 			fmt.Fprintln(r.Writer, err.Error())
 			return err
 		case slot := <-r.SlotQueue:
-			msg := fmt.Sprintf("[regulator] Got notified that slot %d has arrived", slot)
+			msg := fmt.Sprintf("regulator slot:%012d • new slot!", slot)
 			fmt.Fprintln(r.Writer, msg)
 			if slot == 0 {
-				msg := fmt.Sprintf("[regulator] No point for regulator to act on slot 0 — skipping...")
+				msg := fmt.Sprintf("regulator slot:%012d • no point to act on slot 0 — skipping!", slot)
 				fmt.Fprintln(r.Writer, msg)
 				continue
 			}
 			select {
 			case r.TaskQueue <- slot:
 			default:
-				msg := fmt.Sprintf("[regulator] Unable to push notification of slot %d to task queue (size: %d)",
-					slot, len(r.TaskQueue))
+				msg := fmt.Sprintf("regulator slot:%012d • cannot push notification to task queue (size: %d)", slot, len(r.TaskQueue))
 				fmt.Fprintln(r.Writer, msg)
 				return errors.New(msg)
 			}

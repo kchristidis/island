@@ -163,5 +163,10 @@ func (sc *SDKContext) Install() error {
 	fmt.Fprintln(os.Stdout, "Ledger client created")
 
 	fmt.Fprintln(os.Stdout, "Chaincode installation & instantiation completed")
+
+	println()
+	println()
+	println()
+
 	return nil
 }

@@ -18,7 +18,7 @@ func (oc *opContext) invoke() pp.Response {
 	case "clock":
 		return oc.clock()
 	default:
-		msg := fmt.Sprintf("[%s] Invalid action: %s", oc.txID, oc.args.Action)
+		msg := fmt.Sprintf("tx_id:%s\tevent_id:%s\tslot:%012d\t• invalid action: %s", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action)
 		fmt.Fprintln(w, msg)
 		return shim.Error(msg)
 	}

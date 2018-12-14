@@ -22,7 +22,7 @@ func (oc *opContext) slotvalues() pp.Response {
 	defer iter.Close()
 
 	if !iter.HasNext() {
-		msg := fmt.Sprintf("[%s] No values exist for partial key w/ attributes %s", oc.txID, keyAttrs)
+		msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d • no values exist for partial key w/ attributes %s", oc.txID, oc.args.EventID, oc.args.Slot, keyAttrs)
 		fmt.Fprintln(w, msg)
 		return shim.Error(msg)
 	}
@@ -32,12 +32,12 @@ func (oc *opContext) slotvalues() pp.Response {
 	for iter.HasNext() {
 		respRange, err := iter.Next()
 		if err != nil {
-			msg := fmt.Sprintf("[%s] Failed during iteration on key w/ attributes %s: %s", oc.txID, keyAttrs, err.Error())
+			msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d • failed during iteration on key w/ attributes %s: %s", oc.txID, oc.args.EventID, oc.args.Slot, keyAttrs, err.Error())
 			fmt.Fprintln(w, msg)
 			return shim.Error(msg)
 		}
 		item := respRange.Value
-		msg := fmt.Sprintf("[%s] Adding [%s] to the response payload for key w/ attributes %s", oc.txID, string(item), keyAttrs)
+		msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d • adding tx_id:%s to the response payload for key w/ attributes %s", oc.txID, oc.args.EventID, oc.args.Slot, string(item), keyAttrs)
 		fmt.Fprintln(w, msg)
 		slotOutputVal.Values = append(slotOutputVal.Values, item)
 	}

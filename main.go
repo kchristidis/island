@@ -115,7 +115,7 @@ func run() error {
 	go func() {
 		if err := regtor.Run(); err != nil {
 			once.Do(func() {
-				msg := fmt.Sprint("[regulator] Closing donec")
+				msg := fmt.Sprint("regulator • closing donec")
 				fmt.Fprintln(writer, msg)
 				close(donec)
 			})
@@ -132,7 +132,7 @@ func run() error {
 		go func(i int) {
 			if err = bidders[i].Run(); err != nil {
 				once.Do(func() {
-					msg := fmt.Sprintf("[bidder %04d] Closing donec", bidders[i].ID)
+					msg := fmt.Sprintf("bidder:%04d • closing donec", bidders[i].ID)
 					fmt.Fprintln(writer, msg)
 					close(donec)
 				})
@@ -164,7 +164,7 @@ func run() error {
 		go func(i int) {
 			if err := bnotifiers[i].Run(); err != nil {
 				once.Do(func() {
-					msg := fmt.Sprint("[block notifier] Closing donec")
+					msg := fmt.Sprintf("block-notifier:%d • closing donec", i)
 					fmt.Fprintln(writer, msg)
 					close(donec)
 				})
@@ -197,19 +197,15 @@ func run() error {
 
 	wg1.Wait()
 
-	println()
-
 	once.Do(func() {
-		msg := fmt.Sprint("[main thread] Closing donec")
+		msg := fmt.Sprint("main • closing donec")
 		fmt.Fprintln(writer, msg)
 		close(donec)
 	})
 
 	wg2.Wait()
 
-	fmt.Fprintln(writer, "Run completed")
-
-	println()
+	fmt.Fprintln(writer, "main • run completed")
 
 	return metrics()
 }

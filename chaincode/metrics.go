@@ -13,7 +13,7 @@ import (
 func (oc *opContext) metrics() pp.Response {
 	metricsOutputValB, err := json.Marshal(&metricsOutputVal)
 	if err != nil {
-		msg := fmt.Sprintf("[%s] Cannot encode response as a JSON object: %s", oc.txID, err.Error())
+		msg := fmt.Sprintf("tx_id:%s\tevent_id:%s\tslot:%012d\t• cannot encode response to JSON: %s", oc.txID, oc.args.EventID, oc.args.Slot, err.Error())
 		fmt.Fprintln(w, msg)
 		return shim.Error(msg)
 	}

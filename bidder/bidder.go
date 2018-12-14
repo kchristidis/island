@@ -26,6 +26,10 @@ const (
 	Hi
 )
 
+// RetryCount is the number of times a bidder will
+// repeat a failed chaincode invocation.
+const RetryCount = 3
+
 // ToKWh is a multiplier that converts the trace values into KWh units.
 const ToKWh = 0.25
 
@@ -37,7 +41,7 @@ const BufferLen = 100
 // to feed the goroutine that updates the RecentBidKeys cmap.
 type RecentBidKeysKV struct {
 	Slot          int      // Primary key
-	TxID          string   // Used in Exp1
+	BidEventID    string   // Used in Exp1
 	WriteKeyAttrs []string // Used in Exp3
 }
 
@@ -81,7 +85,7 @@ type Bidder struct {
 
 	PostKeyQueue chan int
 	// Maintains a mapping between the bid for a rowIdx (key) and the
-	// associated event/txID and write-key in the chaincode's KVS. We write
+	// associated event ID and write-key in the chaincode's KVS. We write
 	// to this map during bids (buy/sells), and read from it when we post keys.
 	RecentBidKeys      *cmap.Container
 	RecentBidKeysQueue chan RecentBidKeysKV
@@ -168,7 +172,7 @@ func New(invoker Invoker, slotBidNotifier Notifier, slotPostKeyNotifier Notifier
 
 // Run executes the bidder logic.
 func (b *Bidder) Run() error {
-	msg := fmt.Sprintf("[bidder %04d] Exited", b.ID)
+	msg := fmt.Sprintf("bidder:%04d • exited", b.ID)
 	defer fmt.Fprintln(b.Writer, msg)
 
 	defer func() {
@@ -178,11 +182,11 @@ func (b *Bidder) Run() error {
 
 	for i := range b.Notifiers {
 		if ok := b.Notifiers[i].Register(b.ID, b.SlotQueues[i]); !ok {
-			msg := fmt.Sprintf("[bidder %04d] Unable to register with slot notifier %d", b.ID, i)
+			msg := fmt.Sprintf("bidder:%04d • cannot register with slot notifier %d", b.ID, i)
 			fmt.Fprintln(b.Writer, msg)
 			return errors.New(msg)
 		}
-		msg = fmt.Sprintf("[bidder %04d] Registered with slot notifier %d", b.ID, i)
+		msg = fmt.Sprintf("bidder:%04d • registered with slot notifier %d", b.ID, i)
 		fmt.Fprintln(b.Writer, msg)
 	}
 
@@ -243,11 +247,11 @@ func (b *Bidder) Run() error {
 					oldVals, ok := b.RecentBidKeys.Get(newVal.Slot)
 					if !ok {
 						b.RecentBidKeys.Put(newVal.Slot, map[string][]string{
-							newVal.TxID: newVal.WriteKeyAttrs,
+							newVal.BidEventID: newVal.WriteKeyAttrs,
 						})
 						continue
 					}
-					oldVals.(map[string][]string)[newVal.TxID] = newVal.WriteKeyAttrs
+					oldVals.(map[string][]string)[newVal.BidEventID] = newVal.WriteKeyAttrs
 					b.RecentBidKeys.Put(newVal.Slot, oldVals)
 				case <-b.DoneChan:
 					return
@@ -264,13 +268,13 @@ func (b *Bidder) Run() error {
 		select {
 		case bidSlot := <-b.SlotQueues[0]:
 			rowIdx := int(bidSlot)
-			msg := fmt.Sprintf("[bidder %04d] Got notified that slot %d has arrived - processing row %d for bidding: %v", b.ID, bidSlot, rowIdx, b.Trace[rowIdx])
+			msg := fmt.Sprintf("bidder:%04d slot:%012d • new slot! processing row %d for bidding: %v", b.ID, bidSlot, rowIdx, b.Trace[rowIdx])
 			fmt.Fprintln(b.Writer, msg)
 
 			select {
 			case b.BuyQueue <- rowIdx:
 			default:
-				msg := fmt.Sprintf("[bidder %04d] Unable to push row %d to 'buy' queue (size: %d)", b.ID, rowIdx, len(b.BuyQueue))
+				msg := fmt.Sprintf("bidder:%04d slot:%012d • cannot push row to'buy' queue (size: %d)", b.ID, rowIdx, len(b.BuyQueue))
 				fmt.Fprintln(b.Writer, msg)
 				return errors.New(msg)
 			}
@@ -278,7 +282,7 @@ func (b *Bidder) Run() error {
 			select {
 			case b.SellQueue <- rowIdx:
 			default:
-				msg := fmt.Sprintf("[bidder %04d] Unable to push row %d to 'sell' queue (size: %d)", b.ID, rowIdx, len(b.BuyQueue))
+				msg := fmt.Sprintf("bidder:%04d slot:%012d • cannot push row to 'sell' queue (size: %d)", b.ID, rowIdx, len(b.BuyQueue))
 				fmt.Fprintln(b.Writer, msg)
 				return errors.New(msg)
 			}
@@ -289,13 +293,13 @@ func (b *Bidder) Run() error {
 			}
 		case postKeySlot := <-b.SlotQueues[1]:
 			rowIdx := int(postKeySlot)
-			msg := fmt.Sprintf("[bidder %04d] Got notified that slot %d has arrived - processing row %d for key posting: %v", b.ID, postKeySlot, rowIdx, b.Trace[rowIdx])
+			msg := fmt.Sprintf("bidder:%04d slot:%012d • new slot! processing row %d for key posting: %v", b.ID, postKeySlot, rowIdx, b.Trace[rowIdx])
 			fmt.Fprintln(b.Writer, msg)
 
 			select {
 			case b.PostKeyQueue <- rowIdx:
 			default:
-				msg := fmt.Sprintf("[bidder %04d] Unable to push row %d to 'postKey' queue (size: %d)", b.ID, rowIdx, len(b.PostKeyQueue))
+				msg := fmt.Sprintf("bidder:%04d slot:%012d • cannot push row to 'postKey' queue (size: %d)", b.ID, rowIdx, len(b.PostKeyQueue))
 				fmt.Fprintln(b.Writer, msg)
 				return errors.New(msg)
 			}
@@ -307,8 +311,9 @@ func (b *Bidder) Run() error {
 
 // Buy allows a bidder place a buy offer.
 func (b *Bidder) Buy(rowIdx int) error {
+	eventID := strconv.Itoa(rand.Intn(1E12))
 	row := b.Trace[rowIdx]
-	txID := strconv.Itoa(rand.Intn(1E6))
+
 	if row[Use] > 0 {
 		ppu := row[Lo] + (row[Hi]-row[Lo])*(1.0-rand.Float64())
 
@@ -319,20 +324,19 @@ func (b *Bidder) Buy(rowIdx int) error {
 
 		bidInputValB, err := json.Marshal(bidInputVal)
 		if err != nil {
-			msg := fmt.Sprintf("[bidder %04d] Cannot encode 'buy' bid for slot %d as a JSON object: %s", b.ID, rowIdx, err.Error())
+			msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d • cannot encode 'buy' bid to JSON: %s", b.ID, eventID, rowIdx, err.Error())
 			fmt.Fprintln(b.Writer, msg)
 			return errors.New(msg)
 		}
 
 		encBidInputValB, err := crypto.Encrypt(bidInputValB, b.pubKey)
 		if err != nil {
-			msg := fmt.Sprintf("[bidder %04d] Unable to encrypt 'buy' for row %d: %s\n",
-				b.ID, rowIdx, err)
+			msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d • cannot encrypt 'buy' bid: %s", b.ID, eventID, rowIdx, err)
 			fmt.Fprintln(b.Writer, msg)
 			return errors.New(msg)
 		}
 
-		msg := fmt.Sprintf("[bidder %04d] Invoking 'buy' for %.3f kWh (%.3f kW) at %.3f ç/kWh @ slot %d", b.ID, row[Use]*ToKWh, row[Use], ppu, rowIdx)
+		msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d • about to invoke 'buy' for %.3f kWh (%.3f kW) at %.3f ç/kWh", b.ID, eventID, rowIdx, row[Use]*ToKWh, row[Use], ppu)
 		fmt.Fprintln(b.Writer, msg)
 
 		b.SlotChan <- stats.Slot{
@@ -342,7 +346,7 @@ func (b *Bidder) Buy(rowIdx int) error {
 		}
 
 		args := schema.OpContextInput{
-			EventID: txID,
+			EventID: eventID,
 			Action:  "buy",
 			Slot:    rowIdx,
 			Data:    encBidInputValB,
@@ -358,55 +362,60 @@ func (b *Bidder) Buy(rowIdx int) error {
 
 		if err != nil {
 			b.TransactionChan <- stats.Transaction{
-				ID:              txID,
+				ID:              eventID,
 				Type:            "buy",
 				Status:          err.Error(),
 				LatencyInMillis: elapsed,
 			}
-			msg := fmt.Sprintf("[bidder %04d] Unable to invoke 'buy' for row %d: %s\n", b.ID, rowIdx, err)
+			msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d • cannot invoke 'buy': %s", b.ID, eventID, rowIdx, err)
 			fmt.Fprintln(b.Writer, msg)
 			return errors.New(msg)
 		}
 
+		// Extract the write-key
+		var bidOutputVal schema.BidOutput
+		if err := json.Unmarshal(respB, &bidOutputVal); err != nil {
+			b.TransactionChan <- stats.Transaction{
+				ID:              eventID,
+				Type:            "buy",
+				Status:          err.Error(),
+				LatencyInMillis: elapsed,
+			}
+			msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d • cannot decode JSON response to 'buy' invocation: %s", b.ID, eventID, rowIdx, err.Error())
+			fmt.Fprintln(b.Writer, msg)
+			return errors.New(msg)
+		}
+
+		b.TransactionChan <- stats.Transaction{
+			ID:              eventID,
+			Type:            "buy",
+			Status:          "success",
+			LatencyInMillis: elapsed,
+		}
+
+		msg = fmt.Sprintf("bidder:%04d event_id:%s slot:%012d • success! wrote 'buy' bid to key w/ attributes %s", b.ID, eventID, rowIdx, bidOutputVal.WriteKeyAttrs)
+		fmt.Fprintln(b.Writer, msg)
+
 		// Update the cmap for post-key calls
 		switch schema.ExpNum {
 		case 1, 3:
-			// Extract the write-key
-			var bidOutputVal schema.BidOutput
-			if err := json.Unmarshal(respB, &bidOutputVal); err != nil {
-				b.TransactionChan <- stats.Transaction{
-					ID:              txID,
-					Type:            "buy",
-					Status:          err.Error(),
-					LatencyInMillis: elapsed,
-				}
-				msg := fmt.Sprintf("[bidder %04d] Cannot unmarshal JSON-encoded response associated with tx ID %s: %s", b.ID, txID, err.Error())
-				fmt.Fprintln(b.Writer, msg)
-				return errors.New(msg)
-			}
-
 			b.RecentBidKeysQueue <- RecentBidKeysKV{
 				Slot:          rowIdx,
-				TxID:          txID,
+				BidEventID:    eventID,
 				WriteKeyAttrs: bidOutputVal.WriteKeyAttrs,
 			}
 		default:
 		}
 
-		b.TransactionChan <- stats.Transaction{
-			ID:              txID,
-			Type:            "buy",
-			Status:          "success",
-			LatencyInMillis: elapsed,
-		}
 	}
 	return nil
 }
 
 // Sell allows a bidder to place a sell offer.
 func (b *Bidder) Sell(rowIdx int) error {
-	txID := strconv.Itoa(rand.Intn(1E6))
+	eventID := strconv.Itoa(rand.Intn(1E12))
 	row := b.Trace[rowIdx]
+
 	if row[Gen] > 0 {
 		ppu := row[Lo] + (row[Hi]-row[Lo])*(1.0-rand.Float64())
 
@@ -417,19 +426,19 @@ func (b *Bidder) Sell(rowIdx int) error {
 
 		bidInputValB, err := json.Marshal(bidInputVal)
 		if err != nil {
-			msg := fmt.Sprintf("[bidder %04d] Cannot encode 'sell' bid for slot %d as a JSON object: %s", b.ID, rowIdx, err.Error())
+			msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d • cannot encode 'buy' bid to JSON: %s", b.ID, eventID, rowIdx, err.Error())
 			fmt.Fprintln(b.Writer, msg)
 			return errors.New(msg)
 		}
 
 		encBidInputValB, err := crypto.Encrypt(bidInputValB, b.pubKey)
 		if err != nil {
-			msg := fmt.Sprintf("[bidder %04d] Unable to encrypt 'sell' for row %d: %s\n", b.ID, rowIdx, err)
+			msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d • cannot encrypt 'buy' bid: %s", b.ID, eventID, rowIdx, err)
 			fmt.Fprintln(b.Writer, msg)
 			return errors.New(msg)
 		}
 
-		msg := fmt.Sprintf("[bidder %04d] Invoking 'sell' for %.3f kWh (%.3f kW) at %.3f ç/kWh @ slot %d", b.ID, row[Gen]*ToKWh, row[Gen], ppu, rowIdx)
+		msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d • about to invoke 'sell' for %.3f kWh (%.3f kW) at %.3f ç/kWh @ slot %d", b.ID, eventID, rowIdx, row[Gen]*ToKWh, row[Gen], ppu, rowIdx)
 		fmt.Fprintln(b.Writer, msg)
 
 		b.SlotChan <- stats.Slot{
@@ -439,7 +448,7 @@ func (b *Bidder) Sell(rowIdx int) error {
 		}
 
 		args := schema.OpContextInput{
-			EventID: txID,
+			EventID: eventID,
 			Action:  "sell",
 			Slot:    rowIdx,
 			Data:    encBidInputValB,
@@ -455,46 +464,49 @@ func (b *Bidder) Sell(rowIdx int) error {
 
 		if err != nil {
 			b.TransactionChan <- stats.Transaction{
-				ID:              txID,
+				ID:              eventID,
 				Type:            "sell",
 				Status:          err.Error(),
 				LatencyInMillis: elapsed,
 			}
-			msg := fmt.Sprintf("[bidder %04d] Unable to invoke 'sell' for row %d: %s", b.ID, rowIdx, err)
+			msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d • cannot invoke 'sell': %s", b.ID, eventID, rowIdx, err)
 			fmt.Fprintln(b.Writer, msg)
 			return errors.New(msg)
 		}
 
-		// Update the cmap for post-key calls
-		switch schema.ExpNum {
-		case 1, 3:
-			// Extract the write-key
-			var bidOutputVal schema.BidOutput
-			if err := json.Unmarshal(respB, &bidOutputVal); err != nil {
-				b.TransactionChan <- stats.Transaction{
-					ID:              txID,
-					Type:            "sell",
-					Status:          err.Error(),
-					LatencyInMillis: elapsed,
-				}
-				msg := fmt.Sprintf("[bidder %04d] Cannot unmarshal JSON-encoded response associated with tx ID %s: %s", b.ID, txID, err.Error())
-				fmt.Fprintln(b.Writer, msg)
-				return errors.New(msg)
+		// Extract the write-key
+		var bidOutputVal schema.BidOutput
+		if err := json.Unmarshal(respB, &bidOutputVal); err != nil {
+			b.TransactionChan <- stats.Transaction{
+				ID:              eventID,
+				Type:            "sell",
+				Status:          err.Error(),
+				LatencyInMillis: elapsed,
 			}
-
-			b.RecentBidKeysQueue <- RecentBidKeysKV{
-				Slot:          rowIdx,
-				TxID:          txID,
-				WriteKeyAttrs: bidOutputVal.WriteKeyAttrs,
-			}
-		default:
+			msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d • cannot decode JSON response to 'sell' invocation: %s", b.ID, eventID, rowIdx, err.Error())
+			fmt.Fprintln(b.Writer, msg)
+			return errors.New(msg)
 		}
 
 		b.TransactionChan <- stats.Transaction{
-			ID:              txID,
+			ID:              eventID,
 			Type:            "sell",
 			Status:          "success",
 			LatencyInMillis: elapsed,
+		}
+
+		msg = fmt.Sprintf("bidder:%04d event_id:%s slot:%012d • success! wrote 'sell' bid to key w/ attributes %s", b.ID, eventID, rowIdx, bidOutputVal.WriteKeyAttrs)
+		fmt.Fprintln(b.Writer, msg)
+
+		// Update the cmap for post-key calls
+		switch schema.ExpNum {
+		case 1, 3:
+			b.RecentBidKeysQueue <- RecentBidKeysKV{
+				Slot:          rowIdx,
+				BidEventID:    eventID,
+				WriteKeyAttrs: bidOutputVal.WriteKeyAttrs,
+			}
+		default:
 		}
 	}
 	return nil
@@ -503,43 +515,43 @@ func (b *Bidder) Sell(rowIdx int) error {
 // PostKey allows a bidder to post the private key corresponding to the
 // public key with which they posted an encrypted bid on the ledger.
 func (b *Bidder) PostKey(rowIdx int) error {
-	msg := fmt.Sprintf("[bidder %04d] Invoking 'postKey' @ slot %d", b.ID, rowIdx)
+	msg := fmt.Sprintf("bidder:%04d slot:%012d • about to invoke 'postKey'", b.ID, rowIdx)
 	fmt.Fprintln(b.Writer, msg)
 
 	valMap, ok := b.RecentBidKeys.Get(rowIdx)
 	if !ok {
-		msg := fmt.Sprintf("[bidder %04d] Could not find any bids to post keys for @ slot %d", b.ID, rowIdx)
+		msg := fmt.Sprintf("bidder:%04d slot:%012d • cannot find any bids to post keys for", b.ID, rowIdx)
 		fmt.Fprintln(b.Writer, msg)
 		return errors.New(msg) // Nobody's actually consuming this error for now; that's OK.
 	}
 
-	msg = fmt.Sprintf("[bidder %04d] Found %d bids to post keys for @ slot %d ", b.ID, len(valMap.(map[string][]string)), rowIdx)
+	msg = fmt.Sprintf("bidder:%04d slot:%012d • found %d bids to post keys for", b.ID, rowIdx, len(valMap.(map[string][]string)))
 	fmt.Fprintln(b.Writer, msg)
 
 	mapIdx := 0
 	mapLen := len(valMap.(map[string][]string))
 	for k, v := range valMap.(map[string][]string) {
-		txID := strconv.Itoa(rand.Intn(1E6))
+		eventID := strconv.Itoa(rand.Intn(1E12))
 		mapIdx++
 
-		msg := fmt.Sprintf("[bidder %04d] About to 'postKey' for bid %d of %d with tx ID %s and key w/ attributes %s", b.ID, mapIdx, mapLen, k, v)
+		msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d bid_idx:%d bid_count:%d • about to 'postKey' for bid w/ key %s", b.ID, k, rowIdx, mapIdx, mapLen, v)
 		fmt.Fprintln(b.Writer, msg)
 
 		postKeyInputVal := schema.PostKeyInput{
 			ReadKeyAttrs: v,
 			PrivKey:      b.PrivKeyBytes,
-			TxID:         k, // ATTN: This is the tx ID of the associated bid!
+			BidEventID:   k,
 		}
 
 		postKeyInputValB, err := json.Marshal(postKeyInputVal)
 		if err != nil {
-			msg := fmt.Sprintf("[bidder %04d] Cannot encode 'postKey' payload for slot %d (bid %d of %d) as a JSON object: %s", b.ID, rowIdx, mapIdx, mapLen, err.Error())
+			msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d bid_idx:%d bid_count:%d • cannot encode payload for 'postKey' call to JSON: %s", b.ID, k, rowIdx, mapIdx, mapLen, err.Error())
 			fmt.Fprintln(b.Writer, msg)
 			return errors.New(msg)
 		}
 
 		args := schema.OpContextInput{
-			EventID: txID,
+			EventID: eventID,
 			Action:  "postKey",
 			Slot:    rowIdx,
 			Data:    postKeyInputValB,
@@ -547,7 +559,7 @@ func (b *Bidder) PostKey(rowIdx int) error {
 
 		timeStart := time.Now()
 
-		_, err = b.Invoker.Invoke(args)
+		respB, err := b.Invoker.Invoke(args)
 
 		// Update stats
 		timeEnd := time.Now()
@@ -555,23 +567,40 @@ func (b *Bidder) PostKey(rowIdx int) error {
 
 		if err != nil {
 			b.TransactionChan <- stats.Transaction{
-				ID:              txID,
+				ID:              eventID,
 				Type:            "postKey",
 				Status:          err.Error(),
 				LatencyInMillis: elapsed,
 			}
-			msg := fmt.Sprintf("[bidder %04d] Unable to invoke 'postKey' for row %d (bid %d/%d): %s", b.ID, rowIdx, mapIdx, mapLen, err.Error())
+			msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d bid_idx:%d bid_count:%d • cannot invoke 'postKey': %s", b.ID, k, rowIdx, mapIdx, mapLen, err.Error())
+			fmt.Fprintln(b.Writer, msg)
+			return errors.New(msg)
+		}
+
+		// Extract the write-key
+		var postKeyOutputVal schema.PostKeyOutput
+		if err := json.Unmarshal(respB, &postKeyOutputVal); err != nil {
+			b.TransactionChan <- stats.Transaction{
+				ID:              eventID,
+				Type:            "postKey",
+				Status:          err.Error(),
+				LatencyInMillis: elapsed,
+			}
+			msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d bid_idx:%d bid_count:%d • cannot decode JSON response to 'postKey' invocation: %s", b.ID, k, rowIdx, mapIdx, mapLen, err.Error())
 			fmt.Fprintln(b.Writer, msg)
 			return errors.New(msg)
 		}
 
 		// The green path
 		b.TransactionChan <- stats.Transaction{
-			ID:              txID,
+			ID:              eventID,
 			Type:            "postKey",
 			Status:          "success",
 			LatencyInMillis: elapsed,
 		}
+
+		msg = fmt.Sprintf("bidder:%04d event_id:%s slot:%012d bid_idx:%d bid_count:%d • success! wrote 'postKey' to key w/ attributes %s", b.ID, k, rowIdx, mapIdx, mapLen, postKeyOutputVal.WriteKeyAttrs)
+		fmt.Fprintln(b.Writer, msg)
 	}
 
 	return nil

@@ -50,8 +50,8 @@ func TestBidder(t *testing.T) {
 			close(deadc)
 		}()
 
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Unable to register with slot notifier"))
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Exited"))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("cannot register with slot notifier"))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("exited"))
 
 		close(donec)
 		<-deadc
@@ -80,7 +80,7 @@ func TestBidder(t *testing.T) {
 		close(donec)
 		<-deadc
 
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Exited"))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("exited"))
 		g.Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -109,19 +109,9 @@ func TestBidder(t *testing.T) {
 		b.SlotQueues[0] <- slot
 
 		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say(fmt.Sprintf("slot %d has arrived", slot)))
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Invoking 'buy' for"))
-
-		/* invoker.InvokeReturns(nil, errors.New("foo"))
-		b.SlotQueue <- slot + 1
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Unable to invoke 'buy' for"))
-
-		b.BuyQueue = nil
-		b.SlotQueue <- slot + 1
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say(fmt.Sprintf("Unable to push row %d to 'buy' queue", slot+1+1))) */
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("about to invoke 'buy'"))
 
 		close(donec)
 		<-deadc
-
-		// g.Expect(err).To(HaveOccurred())
 	})
 }

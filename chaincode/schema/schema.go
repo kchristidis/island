@@ -64,7 +64,7 @@ type MetricsOutput struct {
 type PostKeyInput struct {
 	ReadKeyAttrs []string
 	PrivKey      []byte
-	TxID         string // Used in exp 1
+	BidEventID   string // Used in exp 1
 }
 
 // PostKeyOutput is the type that we encapsulate `postKey`'s successful response in.

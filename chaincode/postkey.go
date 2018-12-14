@@ -27,7 +27,7 @@ func (oc *opContext) postKey() pp.Response {
 		return shim.Error(err.Error())
 	}
 	if valB != nil {
-		msg := fmt.Sprintf("[%s] Slot %d has been marked already, aborting 'postKey' 🛑", oc.txID, oc.args.Slot)
+		msg := fmt.Sprintf("tx_id:%s\tevent_id:%s\tslot:%012d\t• slot marked already, aborting 'postKey' 🛑", oc.txID, oc.args.EventID, oc.args.Slot)
 		fmt.Fprintln(w, msg)
 		metricsOutputVal.LateTXsCount[oc.args.Slot]++
 		metricsOutputVal.LateDecryptsCount[oc.args.Slot]++
@@ -62,7 +62,7 @@ func (oc *opContext) postKey() pp.Response {
 
 	switch schema.ExpNum {
 	case 1:
-		// Does this key exist already?
+		// Does the key to which we wish to write exist already?
 		var val map[string][]byte
 		valB, err := oc.Get(keyAttrs)
 		if err != nil {
@@ -79,7 +79,7 @@ func (oc *opContext) postKey() pp.Response {
 		// This is the common path for both cases:
 		// 1. When no value has been persisted under that key before, or
 		// 2. When a value has been persisted before
-		val[postKeyInputVal.TxID] = oc.args.Data // ATTN: It's not oc.txID as this would give us the ID of the *current* transaction
+		val[postKeyInputVal.BidEventID] = oc.args.Data
 		newValB, err := oc.Marshal(val)
 		if err != nil {
 			return shim.Error(err.Error())

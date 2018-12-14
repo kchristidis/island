@@ -40,7 +40,7 @@ func (oc *opContext) markEnd() pp.Response {
 		markEndOutputVal.PrivKey = markEndInputVal.PrivKey
 		keyPair, err = DeserializePrivate(markEndOutputVal.PrivKey)
 		if err != nil {
-			msg := fmt.Sprintf("Cannot load key pair: %s", err.Error())
+			msg := fmt.Sprintf("cannot load key pair: %s", err.Error())
 			fmt.Fprintln(w, msg)
 			metricsOutputVal.ProblematicDecryptCount[oc.args.Slot]++
 			return shim.Error(msg)
@@ -92,44 +92,44 @@ func (oc *opContext) markEnd() pp.Response {
 		}
 	}
 
-	msg := fmt.Sprintf("[%s] Buyer bids for slot %d:", oc.txID, markEndOutputVal.Slot)
+	msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d • buyer bids:", oc.txID, oc.args.EventID, markEndOutputVal.Slot)
 	fmt.Fprintln(w, msg)
 	if len(buyerBids) > 0 {
 		for i, v := range buyerBids {
-			fmt.Fprintf(w, "%2d: %s\n", i, v)
+			fmt.Fprintf(w, "\t\t%2d: %s\n", i, v)
 		}
 	} else {
-		fmt.Fprintln(w, "\tnone")
+		fmt.Fprintln(w, "\t\tnone")
 	}
 
-	msg = fmt.Sprintf("[%s] Seller bids for slot %d:", oc.txID, markEndOutputVal.Slot)
+	msg = fmt.Sprintf("tx_id:%s event_id:%s slot:%012d • seller bids:", oc.txID, oc.args.EventID, markEndOutputVal.Slot)
 	fmt.Fprintln(w, msg)
 	if len(sellerBids) > 0 {
 		for i, v := range sellerBids {
-			fmt.Fprintf(w, "%2d: %s\n", i, v)
+			fmt.Fprintf(w, "\t\t%2d: %s\n", i, v)
 		}
 	} else {
-		fmt.Fprintln(w, "\tnone")
+		fmt.Fprintln(w, "\t\tnone")
 	}
 
 	// Settle the market for that slot
 	if len(sellerBids) > 0 && len(buyerBids) > 0 {
 		res, err := Settle(buyerBids, sellerBids)
 		if err != nil {
-			msg := fmt.Sprintf("[%s] Cannot find clearing price for slot %d: %s", oc.txID, oc.args.Slot, err.Error())
+			msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d • cannot find clearing price: %s", oc.txID, oc.args.EventID, oc.args.Slot, err.Error())
 			fmt.Fprintln(w, msg)
 
 			markEndOutputVal.Message = msg
 		} else { // This is our happy path
 			markEndOutputVal.PricePerUnitInCents = res.PricePerUnit
 			markEndOutputVal.QuantityInKWh = res.Units
-			msg := fmt.Sprintf("[%s] %.6f kWh were cleared at %.3f ç/kWh in slot %d ✅", oc.txID, markEndOutputVal.QuantityInKWh, markEndOutputVal.PricePerUnitInCents, markEndOutputVal.Slot)
+			msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d • %.6f kWh were cleared at %.3f ç/kWh ✅", oc.txID, oc.args.EventID, markEndOutputVal.Slot, markEndOutputVal.QuantityInKWh, markEndOutputVal.PricePerUnitInCents)
 			fmt.Fprintln(w, msg)
 
 			markEndOutputVal.Message = msg
 		}
 	} else {
-		msg := fmt.Sprintf("No market for slot %d (buyer bids: %d, seller bids: %d) 😔", markEndOutputVal.Slot, len(buyerBids), len(sellerBids))
+		msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d • no market (buyer bids: %d, seller bids: %d) 😔", oc.txID, oc.args.EventID, markEndOutputVal.Slot, len(buyerBids), len(sellerBids))
 		fmt.Fprintln(w, msg)
 
 		markEndOutputVal.Message = msg
@@ -183,8 +183,8 @@ func (oc *opContext) newBidCollection1(bidType string) (BidCollection, error) {
 	// - Retrieve the corresponding private key from postKeyVal
 	// - Decrypt and add to bid collection
 
-	for bidTxID, encBidInputValB := range encBidVal {
-		postKeyInputValB, ok := postKeyVal[bidTxID]
+	for bidEventID, encBidInputValB := range encBidVal {
+		postKeyInputValB, ok := postKeyVal[bidEventID]
 		if !ok {
 			metricsOutputVal.ProblematicDecryptCount[oc.args.Slot]++
 			continue // ATTN: We do not return
@@ -196,7 +196,7 @@ func (oc *opContext) newBidCollection1(bidType string) (BidCollection, error) {
 		}
 		keyPair, err := DeserializePrivate(postKeyInputVal.PrivKey)
 		if err != nil {
-			msg := fmt.Sprintf("[%s] Cannot retrieve key-pair from 'postKey' key: %s", oc.txID, err.Error())
+			msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • cannot retrieve key-pair from 'postKey' key: %s", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action, err.Error())
 			fmt.Fprintln(w, msg)
 			metricsOutputVal.ProblematicDecryptCount[oc.args.Slot]++
 			continue
@@ -205,7 +205,7 @@ func (oc *opContext) newBidCollection1(bidType string) (BidCollection, error) {
 		// Decrypt the bid
 		bidInputValB, err := Decrypt(encBidInputValB, keyPair)
 		if err != nil {
-			msg := fmt.Sprintf("[%s] Cannot decrypt encoded payload for 'bid' call: %s", oc.txID, err.Error())
+			msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • cannot decrypt encoded payload for 'bid' call: %s", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action, err.Error())
 			fmt.Fprintln(w, msg)
 			metricsOutputVal.ProblematicDecryptCount[oc.args.Slot]++
 			continue // ATTN: We do not return
@@ -223,7 +223,7 @@ func (oc *opContext) newBidCollection1(bidType string) (BidCollection, error) {
 			Units:        bidInputVal.QuantityInKWh,
 		}
 		resp = append(resp, bid)
-		msg := fmt.Sprintf("[%s] Added a bid to the collection for slot %d: %s", oc.txID, oc.args.Slot, bid)
+		msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • added bid [%s] to the collection", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action, bid)
 		fmt.Fprintln(w, msg)
 	}
 
@@ -241,7 +241,7 @@ func (oc *opContext) newBidCollection2(bidType string, keyPair *rsa.PrivateKey) 
 	defer iter.Close()
 
 	if !iter.HasNext() {
-		msg := fmt.Sprintf("[%s] No values exist for partial bid-key w/ attributes %s", oc.txID, keyAttrs)
+		msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • no values exist for partial bid-key w/ attributes %s", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action, keyAttrs)
 		fmt.Fprintln(w, msg)
 		return resp, nil
 	}
@@ -249,7 +249,7 @@ func (oc *opContext) newBidCollection2(bidType string, keyPair *rsa.PrivateKey) 
 	for iter.HasNext() {
 		bidKV, err := iter.Next() // This holds a bid
 		if err != nil {
-			msg := fmt.Sprintf("[%s] Failed during iteration on bid-key w/ attributes %s: %s", oc.txID, keyAttrs, err.Error())
+			msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • failed during iteration on bid-key w/ attributes %s: %s", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action, keyAttrs, err.Error())
 			fmt.Fprintln(w, msg)
 			metricsOutputVal.ProblematicIterCount[oc.args.Slot]++
 			return nil, errors.New(msg)
@@ -258,7 +258,7 @@ func (oc *opContext) newBidCollection2(bidType string, keyPair *rsa.PrivateKey) 
 		encBidInputValB := bidKV.GetValue()
 		bidInputValB, err := Decrypt(encBidInputValB, keyPair)
 		if err != nil {
-			msg := fmt.Sprintf("[%s] Cannot decrypt encoded payload for 'bid' call: %s", oc.txID, err.Error())
+			msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • cannot decrypt encoded payload for 'bid' call: %s", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action, err.Error())
 			fmt.Fprintln(w, msg)
 			metricsOutputVal.ProblematicDecryptCount[oc.args.Slot]++
 			continue // ATTN: We do not return
@@ -276,7 +276,7 @@ func (oc *opContext) newBidCollection2(bidType string, keyPair *rsa.PrivateKey) 
 			Units:        bidInputVal.QuantityInKWh,
 		}
 		resp = append(resp, bid)
-		msg := fmt.Sprintf("[%s] Added a bid to the collection for slot %d: %s", oc.txID, oc.args.Slot, bid)
+		msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • added bid [%s] to the collection", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action, bid)
 		fmt.Fprintln(w, msg)
 	}
 
@@ -294,7 +294,7 @@ func (oc *opContext) newBidCollection3(bidType string) (BidCollection, error) {
 	defer iter.Close()
 
 	if !iter.HasNext() {
-		msg := fmt.Sprintf("[%s] No values exist for partial bid-key w/ attributes %s", oc.txID, keyAttrs)
+		msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • no values exist for partial bid-key w/ attributes %s", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action, keyAttrs)
 		fmt.Fprintln(w, msg)
 		return resp, nil
 	}
@@ -302,7 +302,7 @@ func (oc *opContext) newBidCollection3(bidType string) (BidCollection, error) {
 	for iter.HasNext() {
 		bidKV, err := iter.Next() // This holds a bid
 		if err != nil {
-			msg := fmt.Sprintf("[%s] Failed during iteration on bid-key w/ attributes %s: %s", oc.txID, keyAttrs, err.Error())
+			msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • failed during iteration on bid-key w/ attributes %s: %s", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action, keyAttrs, err.Error())
 			fmt.Fprintln(w, msg)
 			metricsOutputVal.ProblematicIterCount[oc.args.Slot]++
 			return nil, errors.New(msg)
@@ -333,7 +333,7 @@ func (oc *opContext) newBidCollection3(bidType string) (BidCollection, error) {
 		}
 		keyPair, err := DeserializePrivate(postKeyOutputVal.PrivKey)
 		if err != nil {
-			msg := fmt.Sprintf("[%s] Cannot retrieve key-pair from 'postKey' key: %s", oc.txID, err.Error())
+			msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • cannot retrieve key-pair from 'postKey' key: %s", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action, err.Error())
 			fmt.Fprintln(w, msg)
 			metricsOutputVal.ProblematicDecryptCount[oc.args.Slot]++
 			continue
@@ -343,7 +343,7 @@ func (oc *opContext) newBidCollection3(bidType string) (BidCollection, error) {
 		encBidInputValB := bidKV.GetValue()
 		bidInputValB, err := Decrypt(encBidInputValB, keyPair)
 		if err != nil {
-			msg := fmt.Sprintf("[%s] Cannot decrypt encoded payload for 'bid' call: %s", oc.txID, err.Error())
+			msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • cannot decrypt encoded payload for 'bid' call: %s", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action, err.Error())
 			fmt.Fprintln(w, msg)
 			metricsOutputVal.ProblematicDecryptCount[oc.args.Slot]++
 			continue
@@ -361,7 +361,7 @@ func (oc *opContext) newBidCollection3(bidType string) (BidCollection, error) {
 			Units:        bidInputVal.QuantityInKWh,
 		}
 		resp = append(resp, bid)
-		msg := fmt.Sprintf("[%s] Added a bid to the collection for slot %d: %s", oc.txID, oc.args.Slot, bid)
+		msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • added bid [%s] to the collection", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action, bid)
 		fmt.Fprintln(w, msg)
 	}
 

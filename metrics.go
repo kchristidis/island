@@ -16,12 +16,10 @@ import (
 )
 
 func metrics() error {
-	msg := fmt.Sprint("Time to collect & print the results...")
+	msg := fmt.Sprint("main • time to collect & print the results...")
 	fmt.Fprintln(writer, msg)
 
-	println()
-
-	msg = fmt.Sprint("[metrics] Closing donestatsc...")
+	msg = fmt.Sprint("main • closing donestatsc...")
 	fmt.Fprintln(writer, msg)
 	close(donestatsc)
 	wg3.Wait()
@@ -97,12 +95,12 @@ func metrics() error {
 
 	println()
 
-	fmt.Fprintln(writer, "Transaction stats")
+	fmt.Fprintln(writer, "transaction stats")
 	for _, tx := range stats.TransactionStats {
 		idNum, _ := strconv.Atoi(tx.ID)
 		idVal := fmt.Sprintf("%012d", idNum)
 		latVal := fmt.Sprintf("%d", tx.LatencyInMillis)
-		msg := fmt.Sprintf("[txID: %s]"+
+		msg := fmt.Sprintf("[event_id: %s]"+
 			"\tlatency:%s ms"+
 			"\t\ttype:%s"+
 			"\t\tstatus:%s",
@@ -119,12 +117,12 @@ func metrics() error {
 
 	println()
 
-	fmt.Fprintln(writer, "Block stats")
+	fmt.Fprintln(writer, "block stats")
 
 	querier := sdkctx.LedgerClient
 	resp, err := querier.QueryInfo()
 	if err != nil {
-		msg := fmt.Sprintf("[metrics] Unable to query ledger: %s", err.Error())
+		msg := fmt.Sprintf("main • cannot query ledger: %s", err.Error())
 		fmt.Fprintln(writer, msg)
 		return err
 	}
@@ -134,13 +132,13 @@ func metrics() error {
 	for i := uint64(0); i < height; i++ {
 		block, err := querier.QueryBlock(i)
 		if err != nil {
-			msg := fmt.Sprintf("[metrics] Unable to get block %d's size: %s", i, err.Error())
+			msg := fmt.Sprintf("main • can get block %d's size: %s", i, err.Error())
 			fmt.Fprintln(writer, msg)
 			return err
 		}
 		blockB, err := proto.Marshal(block)
 		if err != nil {
-			msg := fmt.Sprintf("[metrics] Unable to marshal block %d: %s", i, err.Error())
+			msg := fmt.Sprintf("main • cannot marshal block %d: %s", i, err.Error())
 			fmt.Fprintln(writer, msg)
 			return err
 		}
@@ -163,7 +161,7 @@ func metrics() error {
 	)
 
 	args := schema.OpContextInput{
-		EventID: strconv.Itoa(rand.Intn(1E6)),
+		EventID: strconv.Itoa(rand.Intn(1E12)),
 		Action:  "metrics",
 	}
 	if respB, err = sdkctx.Query(args); err != nil {
@@ -171,11 +169,11 @@ func metrics() error {
 	}
 
 	if err := json.Unmarshal(respB, &metricsOutputVal); err != nil {
-		msg := fmt.Sprintf("Cannot unmarshal returned response: %s", err.Error())
+		msg := fmt.Sprintf("main • cannot unmarshal returned response: %s", err.Error())
 		fmt.Fprintln(writer, msg)
 	}
 
-	msg = fmt.Sprintf("Cleared slot stats")
+	msg = fmt.Sprintf("main • cleared slot stats")
 	fmt.Fprintln(writer, msg)
 	// We decrement LargestSlotSeen by 1 because we care about the
 	// *cleared* slot, i.e. those slots where we had a MarkEnd call.
@@ -238,7 +236,7 @@ func metrics() error {
 
 	println()
 
-	msg = fmt.Sprintf("Number of goroutines still running: %d", runtime.NumGoroutine())
+	msg = fmt.Sprintf("main • number of goroutines still running: %d", runtime.NumGoroutine())
 	fmt.Fprintln(writer, msg)
 
 	return nil

@@ -14,7 +14,7 @@ func (oc *opContext) query() pp.Response {
 	case "slotValues":
 		return oc.slotvalues()
 	default:
-		msg := fmt.Sprintf("[%s] Invalid query action: %s", oc.txID, oc.args.Action)
+		msg := fmt.Sprintf("tx_id:%s\tevent_id:%s\tslot:%012d\t• invalid query action: %s", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action)
 		fmt.Fprintln(w, msg)
 		return shim.Error(msg)
 	}

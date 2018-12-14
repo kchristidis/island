@@ -83,11 +83,11 @@ func New(blocksperslot int, clockperiod time.Duration, sleepduration time.Durati
 // Run executes the notifier logic.
 func (n *Notifier) Run() error {
 	defer func() {
-		msg := fmt.Sprintf("[block notifier %02d] Exited", n.StartFromBlock)
+		msg := fmt.Sprintf("block-notifier:%02d • exited", n.StartFromBlock)
 		fmt.Fprintln(n.Writer, msg)
 	}()
 
-	msg := fmt.Sprintf("[block notifier %02d] Running", n.StartFromBlock)
+	msg := fmt.Sprintf("block-notifier:%02d • running", n.StartFromBlock)
 	fmt.Fprintln(n.Writer, msg)
 
 	defer func() {
@@ -105,7 +105,7 @@ func (n *Notifier) Run() error {
 				return
 			case <-ticker.C:
 				args := schema.OpContextInput{
-					EventID: strconv.Itoa(rand.Intn(1E6)),
+					EventID: strconv.Itoa(rand.Intn(1E12)),
 					Action:  "clock",
 				}
 				n.Invoker.Invoke(args)
@@ -122,8 +122,7 @@ func (n *Notifier) Run() error {
 		default:
 			resp, err := n.Querier.QueryInfo()
 			if err != nil {
-				msg := fmt.Sprintf("[block notifier %02d] Unable to query ledger: %s",
-					n.StartFromBlock, err.Error())
+				msg := fmt.Sprintf("block-notifier:%02d • cannot query ledger: %s", n.StartFromBlock, err.Error())
 				fmt.Fprintln(n.Writer, msg)
 				return err
 			}
@@ -131,8 +130,7 @@ func (n *Notifier) Run() error {
 			inHeight := resp.BCI.GetHeight() - 1 // ATTN: Do not forget to decrement by 1
 			if inHeight > n.MostRecentBlockHeight {
 				n.MostRecentBlockHeight = inHeight
-				msg := fmt.Sprintf("[block notifier %02d] Block %d committed at the peer",
-					n.StartFromBlock, int(n.MostRecentBlockHeight))
+				msg := fmt.Sprintf("block-notifier:%02d block:%012d • block committed at the peer", n.StartFromBlock, int(n.MostRecentBlockHeight))
 				fmt.Fprintln(n.Writer, msg)
 			}
 
@@ -144,16 +142,14 @@ func (n *Notifier) Run() error {
 				}
 
 				if inHeight != n.StartFromBlock {
-					msg := fmt.Sprintf("[block notifier %02d] WARNING: This is NOT the start block (expected %d - got %d)",
-						n.StartFromBlock, int(n.BlockHeightOfMostRecentSlot), int(inHeight))
+					msg := fmt.Sprintf("bloc-knotifier:%02d block:%012d • expected block %012d as start block", n.StartFromBlock, inHeight, n.StartFromBlock)
 					fmt.Println(n.Writer, msg)
-					return fmt.Errorf("[block notifier %02d] Expected to start with block %d, got block %d instead", n.StartFromBlock, n.StartFromBlock, inHeight)
+					return fmt.Errorf(msg)
 				}
 
 				n.MostRecentSlot = int(inHeight - n.StartFromBlock) // should be 0
 				n.BlockHeightOfMostRecentSlot = inHeight
-				msg = fmt.Sprintf("[block notifier %02d] Block %d corresponds to slot %d",
-					n.StartFromBlock, inHeight, n.MostRecentSlot)
+				msg = fmt.Sprintf("block-notifier:%02d block:%012d • new slot! block corresponds to slot %012d", n.StartFromBlock, inHeight, n.MostRecentSlot)
 				fmt.Fprintln(n.Writer, msg)
 				n.SlotChan <- n.MostRecentSlot
 			default: // We're hitting this case only after we've reached StartFromBlock
@@ -164,8 +160,7 @@ func (n *Notifier) Run() error {
 				if int(inHeight-n.StartFromBlock)%n.BlocksPerSlot == 0 {
 					n.MostRecentSlot = int(inHeight-n.StartFromBlock) / n.BlocksPerSlot
 					n.BlockHeightOfMostRecentSlot = inHeight
-					msg := fmt.Sprintf("[block notifier %02d] Block %d corresponds to slot %d",
-						n.StartFromBlock, inHeight, n.MostRecentSlot)
+					msg := fmt.Sprintf("block-notifier:%02d block:%012d • new slot! block corresponds to slot %012d", n.StartFromBlock, inHeight, n.MostRecentSlot)
 					fmt.Fprintln(n.Writer, msg)
 					n.SlotChan <- n.MostRecentSlot
 				}

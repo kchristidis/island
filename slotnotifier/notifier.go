@@ -49,11 +49,11 @@ func (n *Notifier) Register(id int, queue chan int) bool {
 // Run executes the notifier logic.
 func (n *Notifier) Run() {
 	defer func() {
-		msg := fmt.Sprintf("[slot notifier %02dd] Exited", n.ID)
+		msg := fmt.Sprintf("slot-notifier:%02d • exited", n.ID)
 		fmt.Fprintln(n.Writer, msg)
 	}()
 
-	msg := fmt.Sprintf("[slot notifier %02d] Running", n.ID)
+	msg := fmt.Sprintf("slot-notifier:%02d • running", n.ID)
 	fmt.Fprintln(n.Writer, msg)
 
 	for {
@@ -61,8 +61,7 @@ func (n *Notifier) Run() {
 		case <-n.DoneChan:
 			return
 		case newVal := <-n.SourceChan:
-			msg := fmt.Sprintf("\n[slot notifier %02d] Received slot %d from block notifier\n",
-				n.ID, newVal)
+			msg := fmt.Sprintf("slot-notifier:%02d slot:%012d • received new slot from block notifier", n.ID, newVal)
 			fmt.Fprintln(n.Writer, msg)
 			if newVal > n.LastVal {
 				n.LastVal = newVal
@@ -72,11 +71,9 @@ func (n *Notifier) Run() {
 						id := k.(int)
 						var msg string
 						if id == -1 {
-							msg = fmt.Sprintf("[slot notifier %02d] Sent slot %d to regulator",
-								n.ID, newVal)
+							msg = fmt.Sprintf("slot-notifier:%02d slot:%012d • sent new slot to regulator", n.ID, newVal)
 						} else {
-							msg = fmt.Sprintf("[slot notifier %02d] Sent slot %d to agent %d",
-								n.ID, newVal, id)
+							msg = fmt.Sprintf("slot-notifier:%02d slot:%012d • sent new slot to agent %d", n.ID, newVal, id)
 						}
 						fmt.Fprintln(n.Writer, msg)
 						return true

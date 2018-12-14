@@ -54,6 +54,6 @@ func TestNotifier(t *testing.T) {
 		close(donec)
 
 		// Signal closes properly
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Exited"))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("exited"))
 	})
 }

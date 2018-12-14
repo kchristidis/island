@@ -24,7 +24,7 @@ func newOpContext(stub shim.ChaincodeStubInterface) (*opContext, error) {
 
 	var OpContextInputVal schema.OpContextInput
 	if err := json.Unmarshal(args[1], &OpContextInputVal); err != nil {
-		msg := fmt.Sprintf("Cannot unmarshal JSON-encoded payload: %s", err.Error())
+		msg := fmt.Sprintf("cannot decode JSON op-context: %s", err.Error())
 		fmt.Fprintln(w, msg)
 		return nil, errors.New(msg)
 	}
@@ -40,7 +40,7 @@ func newOpContext(stub shim.ChaincodeStubInterface) (*opContext, error) {
 
 	switch oc.args.Action {
 	case "buy", "sell", "postKey", "markEnd":
-		msg = fmt.Sprintf("[%s] Incoming: %s for slot %d (event ID: %s)", oc.txID, oc.args.Action, oc.args.Slot, oc.args.EventID)
+		msg = fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • incoming action!", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action)
 		fmt.Fprintln(w, msg)
 	default:
 		// Do not error on other actions, as they may correspond to valid queries.
@@ -56,7 +56,7 @@ func (oc *opContext) run() pp.Response {
 	case "query":
 		return oc.query()
 	default:
-		msg := fmt.Sprintf("[%s] Invalid function: %s", oc.txID, oc.fn)
+		msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • invalid function: %s", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action, oc.fn)
 		fmt.Fprintln(w, msg)
 		return shim.Error(msg)
 	}

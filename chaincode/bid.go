@@ -26,7 +26,7 @@ func (oc *opContext) bid() pp.Response {
 		return shim.Error(err.Error())
 	}
 	if valB != nil {
-		msg := fmt.Sprintf("[%s] Slot %d has been marked already, aborting 'bid' 🛑", oc.txID, oc.args.Slot)
+		msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • slot marked already, aborting 'bid' 🛑", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action)
 		fmt.Fprintln(w, msg)
 		metricsOutputVal.LateTXsCount[oc.args.Slot]++
 		switch oc.args.Action {
@@ -45,7 +45,7 @@ func (oc *opContext) bid() pp.Response {
 
 	switch schema.ExpNum {
 	case 1:
-		// Does this key exist already?
+		// Does the key to which we wish to write exist already?
 		keyAttrs = []string{strconv.Itoa(oc.args.Slot), "-", oc.args.Action}
 		var val map[string][]byte
 		valB, err := oc.Get(keyAttrs)
@@ -58,12 +58,12 @@ func (oc *opContext) bid() pp.Response {
 				return shim.Error(err.Error())
 			}
 			// Start debug
-			dbg := fmt.Sprintf("[%s] A map exists:\n%+v\n\n", oc.txID, val)
+			dbg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • a map exists:\n%+v\n\n", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action, val)
 			fmt.Fprintln(w, dbg)
 			// End debug
 		} else {
 			// Start debug
-			dbg := fmt.Sprintf("[%s] A map does not exist", oc.txID)
+			dbg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • a map does not exist", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action)
 			fmt.Fprintln(w, dbg)
 			// End debug
 			val = make(map[string][]byte)

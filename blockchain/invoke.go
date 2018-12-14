@@ -36,16 +36,16 @@ func (sc *SDKContext) Invoke(args schema.OpContextInput) ([]byte, error) {
 		Fcn:         "invoke",
 		Args:        [][]byte{argsB}})
 	if err != nil {
-		return nil, fmt.Errorf("[%s] cannot execute request", args.EventID)
+		return nil, fmt.Errorf("event_id:%s • cannot execute request", args.EventID)
 	}
 
 	if schema.EnableEvents {
 		// Wait for the result of the submission
 		select {
 		case <-notifier:
-			// fmt.Fprintf(os.Stdout, "Received update for event ID %s\n", ccEvent.EventName)
+			// fmt.Fprintf(os.Stdout, "received update for event ID %s", ccEvent.EventName)
 		case <-time.After(InvokeTimeout):
-			return nil, fmt.Errorf("[%s] did not hear back on event in time: %s", args.EventID, err.Error())
+			return nil, fmt.Errorf("event_id:%s • did not hear back on event in time: %s", args.EventID, err.Error())
 		}
 	}
 

@@ -10,7 +10,7 @@ import (
 // We are collecting stats on three different keys:
 // - slotNum: energy used (floa64) | hi (float64) | energy generated (float64) |  lo (float64) | energy traded (float64) |  ppu_traded (float64)
 // - blockNum: fileSize (int) -- ATTN: This has now been moved to the main thread
-// - txID: type (string) | status (string) | latency in ms (int)
+// - eventID: type (string) | status (string) | latency in ms (int)
 
 // Slot ...
 type Slot struct {
@@ -53,7 +53,7 @@ type Collector struct {
 
 // Run ...
 func (c *Collector) Run() {
-	defer fmt.Fprintln(c.Writer, "[stats collector] Exited")
+	defer fmt.Fprintln(c.Writer, "stats • exited")
 
 	for {
 		select {
