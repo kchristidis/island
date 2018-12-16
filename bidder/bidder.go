@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"math/rand"
 	"strconv"
 	"sync"
@@ -266,7 +267,6 @@ func (b *Bidder) Run() error {
 			rowIdx := int(bidSlot)
 			msg := fmt.Sprintf("bidder:%04d slot:%012d • new slot! processing row %d for bidding: %v", b.ID, bidSlot, rowIdx, b.Trace[rowIdx])
 			fmt.Fprintln(b.Writer, msg)
-
 			select {
 			case b.BuyQueue <- rowIdx:
 			default:
@@ -358,8 +358,15 @@ func (b *Bidder) Buy(rowIdx int) error {
 		// might be reported multiple times when we collect metrics. That is OK; the
 		// attempt value changes.
 		for i := 0; i <= schema.RetryCount; i++ {
+			var delayBlocks int
+			if schema.ExpNum == 1 {
+				delayBlocks = rand.Intn(int(schema.Alpha * math.Exp2(float64(i))))
+				delayTimer := time.NewTimer(time.Duration(delayBlocks) * schema.BatchTimeout)
+				<-delayTimer.C
+			}
+
 			attempt = i + 1
-			msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d attempt:%d • about to invoke 'buy' for %.6f kWh (%.6f kW) at %.6f ç/kWh", b.ID, eventID, rowIdx, attempt, row[Use]*ToKWh, row[Use], ppu)
+			msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d attempt:%d blocks_waited:%d • about to invoke 'buy' for %.6f kWh (%.6f kW) at %.6f ç/kWh", b.ID, eventID, rowIdx, attempt, delayBlocks, row[Use]*ToKWh, row[Use], ppu)
 			fmt.Fprintln(b.Writer, msg)
 
 			timeStart := time.Now()
@@ -475,8 +482,15 @@ func (b *Bidder) Sell(rowIdx int) error {
 		var attempt int
 
 		for i := 0; i <= schema.RetryCount; i++ {
+			var delayBlocks int
+			if schema.ExpNum == 1 {
+				delayBlocks = rand.Intn(int(schema.Alpha * math.Exp2(float64(i))))
+				delayTimer := time.NewTimer(time.Duration(delayBlocks) * schema.BatchTimeout)
+				<-delayTimer.C
+			}
+
 			attempt = i + 1
-			msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d attempt:%d • about to invoke 'sell' for %.6f kWh (%.6f kW) at %.6f ç/kWh @ slot %d", b.ID, eventID, rowIdx, attempt, row[Gen]*ToKWh, row[Gen], ppu, rowIdx)
+			msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d attempt:%d blocks_waited:%d • about to invoke 'sell' for %.6f kWh (%.6f kW) at %.6f ç/kWh @ slot %d", b.ID, eventID, rowIdx, attempt, delayBlocks, row[Gen]*ToKWh, row[Gen], ppu, rowIdx)
 			fmt.Fprintln(b.Writer, msg)
 
 			timeStart := time.Now()
@@ -592,8 +606,15 @@ func (b *Bidder) PostKey(rowIdx int) error {
 		var attempt int
 
 		for i := 0; i <= schema.RetryCount; i++ {
+			var delayBlocks int
+			if schema.ExpNum == 1 {
+				delayBlocks = rand.Intn(int(schema.Alpha * math.Exp2(float64(i))))
+				delayTimer := time.NewTimer(time.Duration(delayBlocks) * schema.BatchTimeout)
+				<-delayTimer.C
+			}
+
 			attempt = i + 1
-			msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d bid_idx:%d bid_count:%d attempt:%d • about to 'postKey' for bid w/ event_id %s and key %s", b.ID, eventID, rowIdx, mapIdx, mapLen, attempt, k, v)
+			msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d bid_idx:%d bid_count:%d attempt:%d blocks_waited:%d • about to 'postKey' for bid w/ event_id %s and key %s", b.ID, eventID, rowIdx, mapIdx, mapLen, attempt, delayBlocks, k, v)
 			fmt.Fprintln(b.Writer, msg)
 
 			timeStart := time.Now()

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/kchristidis/island/chaincode/schema"
@@ -240,6 +241,9 @@ func metrics() error {
 	println()
 
 	msg = fmt.Sprintf("main • number of goroutines still running: %d", runtime.NumGoroutine())
+	fmt.Fprintln(writer, msg)
+
+	msg = fmt.Sprintf("main • run completed in %s", time.Now().Sub(timestart))
 	fmt.Fprintln(writer, msg)
 
 	return nil

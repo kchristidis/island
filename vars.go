@@ -39,6 +39,9 @@ var (
 	// The prefix for all `Output*` files above
 	outputprefix string
 
+	// Track the duration of a simulation
+	timestart time.Time
+
 	bidders    [BidderCount]*bidder.Bidder
 	regtor     *regulator.Regulator
 	bnotifiers []*blocknotifier.Notifier

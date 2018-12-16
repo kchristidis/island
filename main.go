@@ -30,8 +30,8 @@ func run() error {
 	iter++
 	outputprefix = fmt.Sprintf("exp-%02d-run-%02d", schema.ExpNum, iter)
 
-	clockperiod = 400 * time.Millisecond
-	sleepduration = 100 * time.Millisecond
+	timestart = time.Now()
+
 	startfromblock = uint64(10)
 
 	statslotc = make(chan stats.Slot, StatChannelBuffer)
@@ -121,8 +121,8 @@ func run() error {
 		wg2.Done()
 	}()
 
-	for i, ID := range trace.IDs {
-		// for i, ID := range []int{171, 1103} {
+	// for i, ID := range trace.IDs {
+	for i, ID := range []int{171, 1103} {
 		bidders[i] = bidder.New(sdkctx, snotifiers[0], snotifiers[1],
 			ID, privkeybytes, tracemap[ID],
 			statslotc, statstranc, writer, donec)
@@ -142,7 +142,7 @@ func run() error {
 	// The size of the slotcs slice dictates how many block notifiers we need
 
 	bnotifiers = append(bnotifiers, blocknotifier.New(
-		schema.BlocksPerSlot, clockperiod, sleepduration, startfromblock,
+		schema.BlocksPerSlot, schema.ClockPeriod, schema.SleepDuration, startfromblock,
 		slotcs[0],
 		sdkctx, sdkctx.LedgerClient,
 		writer, donec,
@@ -150,7 +150,7 @@ func run() error {
 
 	if len(slotcs) > 1 {
 		bnotifiers = append(bnotifiers, blocknotifier.New(
-			schema.BlocksPerSlot, clockperiod, sleepduration, startfromblock+uint64(schema.BlockOffset),
+			schema.BlocksPerSlot, schema.ClockPeriod, schema.SleepDuration, startfromblock+uint64(schema.BlockOffset),
 			slotcs[1],
 			sdkctx, sdkctx.LedgerClient,
 			writer, donec,
