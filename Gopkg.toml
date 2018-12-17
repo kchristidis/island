@@ -1,4 +1,4 @@
-ignored = ["github.com/kchristidis/island/exp2/chaincode"]
+ignored = ["github.com/kchristidis/island/chaincode"]
 
 [[constraint]]
   # Release v1.0.0-alpha4
