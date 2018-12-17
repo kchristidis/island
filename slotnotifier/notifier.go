@@ -68,14 +68,14 @@ func (n *Notifier) Run() {
 				n.Subs.Range(func(k, v interface{}) bool {
 					select {
 					case v.(chan int) <- n.LastVal:
-						id := k.(int)
+						/* id := k.(int)
 						var msg string
 						if id == -1 {
 							msg = fmt.Sprintf("slot-notifier:%02d slot:%012d • sent new slot to regulator", n.ID, newVal)
 						} else {
 							msg = fmt.Sprintf("slot-notifier:%02d slot:%012d • sent new slot to agent %d", n.ID, newVal, id)
 						}
-						fmt.Fprintln(n.Writer, msg)
+						fmt.Fprintln(n.Writer, msg) */
 						return true
 					default:
 						return false

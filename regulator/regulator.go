@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
-	"strconv"
 	"sync"
 	"time"
 
@@ -111,8 +110,8 @@ func (r *Regulator) Run() error {
 		return errors.New(msg)
 	}
 
-	msg = fmt.Sprint("regulator • registered with slot notifier")
-	fmt.Fprintln(r.Writer, msg)
+	/* msg = fmt.Sprint("regulator • registered with slot notifier")
+	fmt.Fprintln(r.Writer, msg) */
 
 	r.waitGroup.Add(1)
 	go func() {
@@ -123,7 +122,7 @@ func (r *Regulator) Run() error {
 				return
 			case slot := <-r.TaskQueue:
 				affectedSlot := slot - 1
-				eventID := strconv.Itoa(rand.Intn(1E12))
+				eventID := fmt.Sprintf("%013d", rand.Intn(1E12))
 
 				msg := fmt.Sprintf("regulator event_id:%s slot:%012d • about to invoke 'markEnd' - note! this will mark the end of slot %012d", eventID, slot, affectedSlot)
 				fmt.Fprintln(r.Writer, msg)
@@ -169,7 +168,7 @@ func (r *Regulator) Run() error {
 						Status:          err.Error(),
 						LatencyInMillis: elapsed,
 					}
-					msg := fmt.Sprintf("regulator event_id:%s slot:%012d • failure! cannot invoke 'markEnd':\n\t\t%s\n", eventID, slot, err)
+					msg := fmt.Sprintf("regulator event_id:%s slot:%012d • failure! cannot invoke 'markEnd': %s\n", eventID, slot, err)
 					r.ErrChan <- errors.New(msg)
 				} else {
 					r.TransactionChan <- stats.Transaction{
@@ -187,7 +186,7 @@ func (r *Regulator) Run() error {
 						continue
 					}
 
-					msg := fmt.Sprintf("regulator event_id:%s slot:%012d • invocation response:\n\t\t%s", eventID, slot, markendOutputVal.Message)
+					msg := fmt.Sprintf("regulator event_id:%s slot:%012d • invocation response: %s", eventID, slot, markendOutputVal.Message)
 					fmt.Fprintln(r.Writer, msg)
 					if slot > -1 { // The markEnd call @ -1 is useless.
 						r.SlotChan <- stats.Slot{

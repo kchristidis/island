@@ -3,6 +3,7 @@ package blockchain
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel"
@@ -36,7 +37,13 @@ func (sc *SDKContext) Invoke(args schema.OpContextInput) ([]byte, error) {
 		Fcn:         "invoke",
 		Args:        [][]byte{argsB}})
 	if err != nil {
-		return nil, fmt.Errorf("event_id:%s • cannot execute request", args.EventID)
+		var msg string
+		if strings.Contains(err.Error(), " MVCC_READ_CONFLICT") {
+			msg = "failure: mvcc_read_conflict"
+		} else {
+			msg = err.Error()
+		}
+		return nil, fmt.Errorf("%s", msg)
 	}
 
 	if schema.EnableEvents {

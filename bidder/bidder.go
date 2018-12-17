@@ -8,7 +8,6 @@ import (
 	"io"
 	"math"
 	"math/rand"
-	"strconv"
 	"sync"
 	"time"
 
@@ -33,6 +32,12 @@ const ToKWh = 0.25
 // BufferLen sets the buffer length for the slot/task channels, and the
 // bid-keys cmap.
 const BufferLen = 100
+
+// Used for the exponential backoff delay calculations in experiment 1.
+var (
+	s rand.Source
+	r *rand.Rand
+)
 
 // RecentBidKeysKV is a type we create for the channel that will be used
 // to feed the goroutine that updates the RecentBidKeys cmap.
@@ -138,12 +143,15 @@ func New(invoker Invoker, slotBidNotifier Notifier, slotPostKeyNotifier Notifier
 
 	cmapKeys, _ := cmap.New(BufferLen)
 
+	s = rand.NewSource(time.Now().UnixNano())
+	r = rand.New(s)
+
 	return &Bidder{
 		Invoker:   invoker,
 		Notifiers: notifiers,
 
 		ID:           id,
-		Trace:        trace[:5], // ATTN: Temporary modification
+		Trace:        trace[:5760], // For debugging, switch to: trace[:5]
 		PrivKeyBytes: privKeyBytes,
 
 		SlotChan:        slotc,
@@ -183,8 +191,8 @@ func (b *Bidder) Run() error {
 			fmt.Fprintln(b.Writer, msg)
 			return errors.New(msg)
 		}
-		msg = fmt.Sprintf("bidder:%04d • registered with slot notifier %d", b.ID, i)
-		fmt.Fprintln(b.Writer, msg)
+		/* msg = fmt.Sprintf("bidder:%04d • registered with slot notifier %d", b.ID, i)
+		fmt.Fprintln(b.Writer, msg) */
 	}
 
 	b.waitGroup.Add(1)
@@ -265,8 +273,8 @@ func (b *Bidder) Run() error {
 		select {
 		case bidSlot := <-b.SlotQueues[0]:
 			rowIdx := int(bidSlot)
-			msg := fmt.Sprintf("bidder:%04d slot:%012d • new slot! processing row %d for bidding: %v", b.ID, bidSlot, rowIdx, b.Trace[rowIdx])
-			fmt.Fprintln(b.Writer, msg)
+			/* msg := fmt.Sprintf("bidder:%04d slot:%012d • new slot! processing row %d for bidding: %v", b.ID, bidSlot, rowIdx, b.Trace[rowIdx])
+			fmt.Fprintln(b.Writer, msg) */
 			select {
 			case b.BuyQueue <- rowIdx:
 			default:
@@ -289,8 +297,8 @@ func (b *Bidder) Run() error {
 			}
 		case postKeySlot := <-b.SlotQueues[1]:
 			rowIdx := int(postKeySlot)
-			msg := fmt.Sprintf("bidder:%04d slot:%012d • new slot! processing row %d for key posting: %v", b.ID, postKeySlot, rowIdx, b.Trace[rowIdx])
-			fmt.Fprintln(b.Writer, msg)
+			/* msg := fmt.Sprintf("bidder:%04d slot:%012d • new slot! processing row %d for key posting: %v", b.ID, postKeySlot, rowIdx, b.Trace[rowIdx])
+			fmt.Fprintln(b.Writer, msg) */
 
 			select {
 			// For exp1:
@@ -312,7 +320,7 @@ func (b *Bidder) Run() error {
 
 // Buy allows a bidder place a buy offer.
 func (b *Bidder) Buy(rowIdx int) error {
-	eventID := strconv.Itoa(rand.Intn(1E12))
+	eventID := fmt.Sprintf("%013d", rand.Intn(1E12))
 	row := b.Trace[rowIdx]
 
 	if row[Use] > 0 {
@@ -353,20 +361,20 @@ func (b *Bidder) Buy(rowIdx int) error {
 		var respB []byte
 		var elapsed int64
 		var attempt int
+		var delayBlocks int
 
 		// A side-effect of the way this is written is that the same transaction ID
 		// might be reported multiple times when we collect metrics. That is OK; the
 		// attempt value changes.
 		for i := 0; i <= schema.RetryCount; i++ {
-			var delayBlocks int
 			if schema.ExpNum == 1 {
-				delayBlocks = rand.Intn(int(schema.Alpha * math.Exp2(float64(i))))
+				delayBlocks = r.Intn(int(schema.Alpha * math.Exp2(float64(i))))
 				delayTimer := time.NewTimer(time.Duration(delayBlocks) * schema.BatchTimeout)
 				<-delayTimer.C
 			}
 
 			attempt = i + 1
-			msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d attempt:%d blocks_waited:%d • about to invoke 'buy' for %.6f kWh (%.6f kW) at %.6f ç/kWh", b.ID, eventID, rowIdx, attempt, delayBlocks, row[Use]*ToKWh, row[Use], ppu)
+			msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d attempt:%d blocks_waited:%02d • about to invoke 'buy' for %.6f kWh (%.6f kW) at %.6f ç/kWh", b.ID, eventID, rowIdx, attempt, delayBlocks, row[Use]*ToKWh, row[Use], ppu)
 			fmt.Fprintln(b.Writer, msg)
 
 			timeStart := time.Now()
@@ -385,7 +393,7 @@ func (b *Bidder) Buy(rowIdx int) error {
 					LatencyInMillis: elapsed,
 					Attempt:         attempt,
 				}
-				msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d attempt:%d • failure! cannot invoke 'buy':\n\t\t%s", b.ID, eventID, rowIdx, attempt, err)
+				msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d attempt:%d blocks_waited:%02d • failure! cannot invoke 'buy': %s", b.ID, eventID, rowIdx, attempt, delayBlocks, err)
 				fmt.Fprintln(b.Writer, msg)
 
 				if i == schema.RetryCount {
@@ -406,7 +414,7 @@ func (b *Bidder) Buy(rowIdx int) error {
 				LatencyInMillis: elapsed,
 				Attempt:         attempt,
 			}
-			msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d attempt:%d • cannot decode JSON response to 'buy' invocation: %s", b.ID, eventID, rowIdx, attempt, err.Error())
+			msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d attempt:%d blocks_waited:%02d • cannot decode JSON response to 'buy' invocation: %s", b.ID, eventID, rowIdx, attempt, delayBlocks, err.Error())
 			fmt.Fprintln(b.Writer, msg)
 			return errors.New(msg)
 		}
@@ -419,7 +427,7 @@ func (b *Bidder) Buy(rowIdx int) error {
 			Attempt:         attempt,
 		}
 
-		msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d attempt:%d • success! wrote 'buy' bid to key w/ attributes %s", b.ID, eventID, rowIdx, attempt, bidOutputVal.WriteKeyAttrs)
+		msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d attempt:%d blocks_waited:%02d • success! wrote 'buy' bid to key w/ attributes %s", b.ID, eventID, rowIdx, attempt, delayBlocks, bidOutputVal.WriteKeyAttrs)
 		fmt.Fprintln(b.Writer, msg)
 
 		// Update the cmap for post-key calls
@@ -439,7 +447,7 @@ func (b *Bidder) Buy(rowIdx int) error {
 
 // Sell allows a bidder to place a sell offer.
 func (b *Bidder) Sell(rowIdx int) error {
-	eventID := strconv.Itoa(rand.Intn(1E12))
+	eventID := fmt.Sprintf("%013d", rand.Intn(1E12))
 	row := b.Trace[rowIdx]
 
 	if row[Gen] > 0 {
@@ -480,17 +488,17 @@ func (b *Bidder) Sell(rowIdx int) error {
 		var respB []byte
 		var elapsed int64
 		var attempt int
+		var delayBlocks int
 
 		for i := 0; i <= schema.RetryCount; i++ {
-			var delayBlocks int
 			if schema.ExpNum == 1 {
-				delayBlocks = rand.Intn(int(schema.Alpha * math.Exp2(float64(i))))
+				delayBlocks = r.Intn(int(schema.Alpha * math.Exp2(float64(i))))
 				delayTimer := time.NewTimer(time.Duration(delayBlocks) * schema.BatchTimeout)
 				<-delayTimer.C
 			}
 
 			attempt = i + 1
-			msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d attempt:%d blocks_waited:%d • about to invoke 'sell' for %.6f kWh (%.6f kW) at %.6f ç/kWh @ slot %d", b.ID, eventID, rowIdx, attempt, delayBlocks, row[Gen]*ToKWh, row[Gen], ppu, rowIdx)
+			msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d attempt:%d blocks_waited:%02d • about to invoke 'sell' for %.6f kWh (%.6f kW) at %.6f ç/kWh @ slot %d", b.ID, eventID, rowIdx, attempt, delayBlocks, row[Gen]*ToKWh, row[Gen], ppu, rowIdx)
 			fmt.Fprintln(b.Writer, msg)
 
 			timeStart := time.Now()
@@ -509,7 +517,7 @@ func (b *Bidder) Sell(rowIdx int) error {
 					LatencyInMillis: elapsed,
 					Attempt:         attempt,
 				}
-				msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d attempt:%d • failure! cannot invoke 'sell':\n\t\t%s", b.ID, eventID, rowIdx, attempt, err)
+				msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d attempt:%d blocks_waited:%02d • failure! cannot invoke 'sell': %s", b.ID, eventID, rowIdx, attempt, delayBlocks, err)
 				fmt.Fprintln(b.Writer, msg)
 				if i == schema.RetryCount {
 					return errors.New(msg)
@@ -529,7 +537,7 @@ func (b *Bidder) Sell(rowIdx int) error {
 				LatencyInMillis: elapsed,
 				Attempt:         attempt,
 			}
-			msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d attempt:%d • cannot decode JSON response to 'sell' invocation: %s", b.ID, eventID, rowIdx, attempt, err.Error())
+			msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d attempt:%d blocks_waited:%02d • cannot decode JSON response to 'sell' invocation: %s", b.ID, eventID, rowIdx, attempt, delayBlocks, err.Error())
 			fmt.Fprintln(b.Writer, msg)
 			return errors.New(msg)
 		}
@@ -542,7 +550,7 @@ func (b *Bidder) Sell(rowIdx int) error {
 			Attempt:         attempt,
 		}
 
-		msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d attempt:%d • success! wrote 'sell' bid to key w/ attributes %s", b.ID, eventID, rowIdx, attempt, bidOutputVal.WriteKeyAttrs)
+		msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d attempt:%d blocks_waited:%02d • success! wrote 'sell' bid to key w/ attributes %s", b.ID, eventID, rowIdx, attempt, delayBlocks, bidOutputVal.WriteKeyAttrs)
 		fmt.Fprintln(b.Writer, msg)
 
 		// Update the cmap for post-key calls
@@ -562,23 +570,32 @@ func (b *Bidder) Sell(rowIdx int) error {
 // PostKey allows a bidder to post the private key corresponding to the
 // public key with which they posted an encrypted bid on the ledger.
 func (b *Bidder) PostKey(rowIdx int) error {
-	msg := fmt.Sprintf("bidder:%04d slot:%012d • about to invoke 'postKey'", b.ID, rowIdx)
-	fmt.Fprintln(b.Writer, msg)
+	/* msg := fmt.Sprintf("bidder:%04d slot:%012d • about to invoke 'postKey'", b.ID, rowIdx)
+	fmt.Fprintln(b.Writer, msg) */
 
 	valMap, ok := b.RecentBidKeys.Get(rowIdx)
 	if !ok {
 		msg := fmt.Sprintf("bidder:%04d slot:%012d • cannot find any bids to post keys for", b.ID, rowIdx)
 		fmt.Fprintln(b.Writer, msg)
+
+		b.TransactionChan <- stats.Transaction{
+			ID:              fmt.Sprintf("%013d", rand.Intn(1E12)),
+			Type:            "postKey",
+			Status:          "failure: no_bids",
+			LatencyInMillis: -1, // We give an invalid value here on purpose
+			Attempt:         0,  // As above
+		}
+
 		return errors.New(msg)
 	}
 
-	msg = fmt.Sprintf("bidder:%04d slot:%012d • found %d bids to post keys for", b.ID, rowIdx, len(valMap.(map[string][]string)))
-	fmt.Fprintln(b.Writer, msg)
+	/* msg = fmt.Sprintf("bidder:%04d slot:%012d • found %d bids to post keys for", b.ID, rowIdx, len(valMap.(map[string][]string)))
+	fmt.Fprintln(b.Writer, msg) */
 
 	mapIdx := 0
 	mapLen := len(valMap.(map[string][]string))
 	for k, v := range valMap.(map[string][]string) {
-		eventID := strconv.Itoa(rand.Intn(1E12))
+		eventID := fmt.Sprintf("%013d", rand.Intn(1E12))
 		mapIdx++
 
 		postKeyInputVal := schema.PostKeyInput{
@@ -604,17 +621,17 @@ func (b *Bidder) PostKey(rowIdx int) error {
 		var respB []byte
 		var elapsed int64
 		var attempt int
+		var delayBlocks int
 
 		for i := 0; i <= schema.RetryCount; i++ {
-			var delayBlocks int
 			if schema.ExpNum == 1 {
-				delayBlocks = rand.Intn(int(schema.Alpha * math.Exp2(float64(i))))
+				delayBlocks = r.Intn(int(schema.Alpha * math.Exp2(float64(i))))
 				delayTimer := time.NewTimer(time.Duration(delayBlocks) * schema.BatchTimeout)
 				<-delayTimer.C
 			}
 
 			attempt = i + 1
-			msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d bid_idx:%d bid_count:%d attempt:%d blocks_waited:%d • about to 'postKey' for bid w/ event_id %s and key %s", b.ID, eventID, rowIdx, mapIdx, mapLen, attempt, delayBlocks, k, v)
+			msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d bid_idx:%d bid_count:%d attempt:%d blocks_waited:%02d • about to 'postKey' for bid w/ event_id %s and key %s", b.ID, eventID, rowIdx, mapIdx, mapLen, attempt, delayBlocks, k, v)
 			fmt.Fprintln(b.Writer, msg)
 
 			timeStart := time.Now()
@@ -633,7 +650,7 @@ func (b *Bidder) PostKey(rowIdx int) error {
 					LatencyInMillis: elapsed,
 					Attempt:         attempt,
 				}
-				msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d bid_idx:%d bid_count:%d attempt:%d • failure! cannot invoke 'postKey' for bid w/ event_id %s:\n\t\t%s", b.ID, eventID, rowIdx, mapIdx, mapLen, attempt, k, err.Error())
+				msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d bid_idx:%d bid_count:%d attempt:%d blocks_waited:%02d • failure! cannot invoke 'postKey' for bid w/ event_id %s: %s", b.ID, eventID, rowIdx, mapIdx, mapLen, attempt, delayBlocks, k, err.Error())
 				fmt.Fprintln(b.Writer, msg)
 
 				if i == schema.RetryCount {
@@ -654,7 +671,7 @@ func (b *Bidder) PostKey(rowIdx int) error {
 				LatencyInMillis: elapsed,
 				Attempt:         attempt,
 			}
-			msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d bid_idx:%d bid_count:%d attempt:%d • cannot decode JSON response to 'postKey' invocation for bid w/ event_id %s: %s", b.ID, eventID, rowIdx, mapIdx, mapLen, attempt, k, err.Error())
+			msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d bid_idx:%d bid_count:%d attempt:%d blocks_waited:%02d • cannot decode JSON response to 'postKey' invocation for bid w/ event_id %s: %s", b.ID, eventID, rowIdx, mapIdx, mapLen, attempt, delayBlocks, k, err.Error())
 			fmt.Fprintln(b.Writer, msg)
 			return errors.New(msg)
 		}
@@ -668,7 +685,7 @@ func (b *Bidder) PostKey(rowIdx int) error {
 			Attempt:         attempt,
 		}
 
-		msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d bid_idx:%d bid_count:%d attempt:%d • success! wrote 'postKey' for bid w/ event_id %s to key w/ attributes %s", b.ID, eventID, rowIdx, mapIdx, mapLen, attempt, k, postKeyOutputVal.WriteKeyAttrs)
+		msg := fmt.Sprintf("bidder:%04d event_id:%s slot:%012d bid_idx:%d bid_count:%d attempt:%d blocks_waited:%02d • success! wrote 'postKey' for bid w/ event_id %s to key w/ attributes %s", b.ID, eventID, rowIdx, mapIdx, mapLen, attempt, delayBlocks, k, postKeyOutputVal.WriteKeyAttrs)
 		fmt.Fprintln(b.Writer, msg)
 	}
 

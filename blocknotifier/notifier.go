@@ -130,8 +130,8 @@ func (n *Notifier) Run() error {
 			inHeight := resp.BCI.GetHeight() - 1 // ATTN: Do not forget to decrement by 1
 			if inHeight > n.MostRecentBlockHeight {
 				n.MostRecentBlockHeight = inHeight
-				msg := fmt.Sprintf("block-notifier:%02d block:%012d • block committed at the peer", n.StartFromBlock, int(n.MostRecentBlockHeight))
-				fmt.Fprintln(n.Writer, msg)
+				// msg := fmt.Sprintf("block-notifier:%02d block:%012d • block committed at the peer", n.StartFromBlock, int(n.MostRecentBlockHeight))
+				// fmt.Fprintln(n.Writer, msg)
 			}
 
 			// Slot notifier
