@@ -207,7 +207,7 @@ func (r *Regulator) Run() error {
 		select {
 		case err := <-r.ErrChan:
 			fmt.Fprintln(r.Writer, err.Error())
-			return err
+			// return err
 		case slot := <-r.SlotQueue:
 			msg := fmt.Sprintf("regulator slot:%012d • new slot!", slot)
 			fmt.Fprintln(r.Writer, msg)
