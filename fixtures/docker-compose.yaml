@@ -52,6 +52,7 @@ services:
       - /var/run/:/host/var/run/
       - ./crypto-config/peerOrganizations/clark.example.com/peers/peer0.clark.example.com/msp:/var/hyperledger/msp
       - ./crypto-config/peerOrganizations/clark.example.com/peers/peer0.clark.example.com/tls:/var/hyperledger/tls
+      - ../volumes/peer:/var/hyperledger/production
     ports:
       - 7051:7051
       - 7053:7053
