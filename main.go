@@ -34,6 +34,7 @@ func run() error {
 
 	startfromblock = uint64(10)
 
+	statblockc = make(chan stats.Block, StatChannelBuffer)
 	statslotc = make(chan stats.Slot, StatChannelBuffer)
 	statstranc = make(chan stats.Transaction, StatChannelBuffer)
 
@@ -84,6 +85,7 @@ func run() error {
 	}
 
 	statscollector = &stats.Collector{
+		BlockChan:       statblockc,
 		SlotChan:        statslotc,
 		TransactionChan: statstranc,
 		Writer:          writer,
@@ -121,8 +123,8 @@ func run() error {
 		wg2.Done()
 	}()
 
-	for i, ID := range trace.IDs {
-		// for i, ID := range []int{171, 1103} { // For debugging only
+	// for i, ID := range trace.IDs {
+	for i, ID := range []int{171, 1103} { // For debugging only
 		bidders[i] = bidder.New(sdkctx, snotifiers[0], snotifiers[1],
 			ID, privkeybytes, tracemap[ID],
 			statslotc, statstranc, writer, donec)
@@ -143,15 +145,16 @@ func run() error {
 
 	bnotifiers = append(bnotifiers, blocknotifier.New(
 		schema.BlocksPerSlot, schema.ClockPeriod, schema.SleepDuration, startfromblock,
-		slotcs[0],
+		statblockc, slotcs[0],
 		sdkctx, sdkctx.LedgerClient,
 		writer, donec,
 	))
 
 	if len(slotcs) > 1 {
+		nilchan := make(chan stats.Block) // This ensures that only the first blocknotifier feeds the stats collector
 		bnotifiers = append(bnotifiers, blocknotifier.New(
 			schema.BlocksPerSlot, schema.ClockPeriod, schema.SleepDuration, startfromblock+uint64(schema.BlockOffset),
-			slotcs[1],
+			nilchan, slotcs[1],
 			sdkctx, sdkctx.LedgerClient,
 			writer, donec,
 		))

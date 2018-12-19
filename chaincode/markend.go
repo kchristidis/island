@@ -168,8 +168,11 @@ func (oc *opContext) newBidCollection1(bidType string) (BidCollection, error) {
 	}
 
 	if err := oc.Unmarshal(encBidValB, &encBidVal); err != nil {
-		// msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • cannot unmarshal encoded bids map", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action)
-		// fmt.Fprintln(w, msg)
+		if LogLevel <= schema.Debug {
+			msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • cannot unmarshal encoded bids map", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action)
+			fmt.Fprintln(w, msg)
+		}
+
 		return nil, err
 	}
 
@@ -178,8 +181,11 @@ func (oc *opContext) newBidCollection1(bidType string) (BidCollection, error) {
 		return nil, err
 	}
 	if err := oc.Unmarshal(postKeyValB, &postKeyVal); err != nil {
-		// msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • cannot unmarshal postKey map", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action)
-		// fmt.Fprintln(w, msg)
+		if LogLevel <= schema.Debug {
+			msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • cannot unmarshal postKey map", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action)
+			fmt.Fprintln(w, msg)
+		}
+
 		return nil, err
 	}
 
@@ -195,8 +201,11 @@ func (oc *opContext) newBidCollection1(bidType string) (BidCollection, error) {
 		}
 		var postKeyInputVal schema.PostKeyInput
 		if err := oc.Unmarshal(postKeyInputValB, &postKeyInputVal); err != nil {
-			// msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • cannot unmarshal 'postKey' value corresponding to event_id: %s", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action, bidEventID)
-			// fmt.Fprintln(w, msg)
+			if LogLevel <= schema.Debug {
+				msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • cannot unmarshal 'postKey' value corresponding to event_id: %s", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action, bidEventID)
+				fmt.Fprintln(w, msg)
+			}
+
 			metricsOutputVal.ProblematicDecryptCount[oc.args.Slot]++
 			continue
 		}
@@ -219,8 +228,11 @@ func (oc *opContext) newBidCollection1(bidType string) (BidCollection, error) {
 
 		var bidInputVal schema.BidInput
 		if err := oc.Unmarshal(bidInputValB, &bidInputVal); err != nil {
-			// msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • cannot unmarshal 'bid' value corresponding to event_id: %s", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action, bidEventID)
-			// fmt.Fprintln(w, msg)
+			if LogLevel <= schema.Debug {
+				msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • cannot unmarshal 'bid' value corresponding to event_id: %s", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action, bidEventID)
+				fmt.Fprintln(w, msg)
+			}
+
 			metricsOutputVal.ProblematicDecryptCount[oc.args.Slot]++
 			continue // ATTN: We do not return
 		}

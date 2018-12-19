@@ -17,6 +17,9 @@ import (
 	"github.com/kchristidis/island/stats"
 )
 
+// LogLevel is the logging level for this package.
+var LogLevel = schema.Info
+
 // The column names in the trace
 const (
 	Gen = iota
@@ -151,7 +154,7 @@ func New(invoker Invoker, slotBidNotifier Notifier, slotPostKeyNotifier Notifier
 		Notifiers: notifiers,
 
 		ID:           id,
-		Trace:        trace[:5760], // For debugging, switch to: trace[:5]
+		Trace:        trace[:5], // [:5] for debugging, [:5760] for production
 		PrivKeyBytes: privKeyBytes,
 
 		SlotChan:        slotc,
@@ -191,8 +194,11 @@ func (b *Bidder) Run() error {
 			fmt.Fprintln(b.Writer, msg)
 			return errors.New(msg)
 		}
-		/* msg = fmt.Sprintf("bidder:%04d • registered with slot notifier %d", b.ID, i)
-		fmt.Fprintln(b.Writer, msg) */
+
+		if LogLevel <= schema.Debug {
+			msg := fmt.Sprintf("bidder:%04d • registered with slot notifier %d", b.ID, i)
+			fmt.Fprintln(b.Writer, msg)
+		}
 	}
 
 	b.waitGroup.Add(1)
@@ -273,8 +279,12 @@ func (b *Bidder) Run() error {
 		select {
 		case bidSlot := <-b.SlotQueues[0]:
 			rowIdx := int(bidSlot)
-			/* msg := fmt.Sprintf("bidder:%04d slot:%012d • new slot! processing row %d for bidding: %v", b.ID, bidSlot, rowIdx, b.Trace[rowIdx])
-			fmt.Fprintln(b.Writer, msg) */
+
+			if LogLevel <= schema.Debug {
+				msg := fmt.Sprintf("bidder:%04d slot:%012d • new slot! processing row %d for bidding: %v", b.ID, bidSlot, rowIdx, b.Trace[rowIdx])
+				fmt.Fprintln(b.Writer, msg)
+			}
+
 			select {
 			case b.BuyQueue <- rowIdx:
 			default:
@@ -297,8 +307,11 @@ func (b *Bidder) Run() error {
 			}
 		case postKeySlot := <-b.SlotQueues[1]:
 			rowIdx := int(postKeySlot)
-			/* msg := fmt.Sprintf("bidder:%04d slot:%012d • new slot! processing row %d for key posting: %v", b.ID, postKeySlot, rowIdx, b.Trace[rowIdx])
-			fmt.Fprintln(b.Writer, msg) */
+
+			if LogLevel <= schema.Debug {
+				msg := fmt.Sprintf("bidder:%04d slot:%012d • new slot! processing row %d for key posting: %v", b.ID, postKeySlot, rowIdx, b.Trace[rowIdx])
+				fmt.Fprintln(b.Writer, msg)
+			}
 
 			select {
 			// For exp1:
@@ -570,8 +583,10 @@ func (b *Bidder) Sell(rowIdx int) error {
 // PostKey allows a bidder to post the private key corresponding to the
 // public key with which they posted an encrypted bid on the ledger.
 func (b *Bidder) PostKey(rowIdx int) error {
-	/* msg := fmt.Sprintf("bidder:%04d slot:%012d • about to invoke 'postKey'", b.ID, rowIdx)
-	fmt.Fprintln(b.Writer, msg) */
+	if LogLevel <= schema.Debug {
+		msg := fmt.Sprintf("bidder:%04d slot:%012d • about to invoke 'postKey'", b.ID, rowIdx)
+		fmt.Fprintln(b.Writer, msg)
+	}
 
 	valMap, ok := b.RecentBidKeys.Get(rowIdx)
 	if !ok {
@@ -589,8 +604,10 @@ func (b *Bidder) PostKey(rowIdx int) error {
 		return errors.New(msg)
 	}
 
-	/* msg = fmt.Sprintf("bidder:%04d slot:%012d • found %d bids to post keys for", b.ID, rowIdx, len(valMap.(map[string][]string)))
-	fmt.Fprintln(b.Writer, msg) */
+	if LogLevel <= schema.Debug {
+		msg := fmt.Sprintf("bidder:%04d slot:%012d • found %d bids to post keys for", b.ID, rowIdx, len(valMap.(map[string][]string)))
+		fmt.Fprintln(b.Writer, msg)
+	}
 
 	mapIdx := 0
 	mapLen := len(valMap.(map[string][]string))

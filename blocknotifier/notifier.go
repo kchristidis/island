@@ -8,11 +8,16 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/ledger"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 	"github.com/hyperledger/fabric-sdk-go/third_party/github.com/hyperledger/fabric/protos/common"
 	"github.com/kchristidis/island/chaincode/schema"
+	"github.com/kchristidis/island/stats"
 )
+
+// LogLevel is the logging level for this package.
+var LogLevel = schema.Info
 
 //go:generate counterfeiter . Invoker
 
@@ -39,7 +44,8 @@ type Notifier struct {
 	SleepDuration  time.Duration // How often do we check for new blocks?
 	StartFromBlock uint64        // Which block will be the very first block of the first slot?
 
-	// BlockChan chan stats.Block // Post block stat (size) notifications here
+	BlockChan chan stats.Block // Used to feed the stats collector
+
 	SlotChan chan int // Post slot notifications here
 
 	BlockHeightOfMostRecentSlot uint64 // Used by the slot notifier
@@ -58,7 +64,7 @@ type Notifier struct {
 
 // New returns a new notifier.
 func New(blocksperslot int, clockperiod time.Duration, sleepduration time.Duration, startfromblock uint64,
-	slotc chan int,
+	blockc chan stats.Block, slotc chan int,
 	invoker Invoker, querier Querier,
 	writer io.Writer, donec chan struct{}) *Notifier {
 	return &Notifier{
@@ -66,6 +72,8 @@ func New(blocksperslot int, clockperiod time.Duration, sleepduration time.Durati
 		ClockPeriod:    clockperiod,
 		SleepDuration:  sleepduration,
 		StartFromBlock: startfromblock,
+
+		BlockChan: blockc,
 
 		SlotChan: slotc,
 
@@ -130,8 +138,38 @@ func (n *Notifier) Run() error {
 			inHeight := resp.BCI.GetHeight() - 1 // ATTN: Do not forget to decrement by 1
 			if inHeight > n.MostRecentBlockHeight {
 				n.MostRecentBlockHeight = inHeight
-				// msg := fmt.Sprintf("block-notifier:%02d block:%012d • block committed at the peer", n.StartFromBlock, int(n.MostRecentBlockHeight))
-				// fmt.Fprintln(n.Writer, msg)
+
+				if LogLevel <= schema.Debug {
+					msg := fmt.Sprintf("block-notifier:%02d block:%012d • block committed at the peer", n.StartFromBlock, int(n.MostRecentBlockHeight))
+					fmt.Fprintln(n.Writer, msg)
+				}
+
+				block, err := n.Querier.QueryBlock(inHeight)
+				if err != nil {
+					msg := fmt.Sprintf("block-notifier:%02d • cannot get block %d's size: %s", n.StartFromBlock, inHeight, err.Error())
+					fmt.Fprintln(n.Writer, msg)
+					return err
+				}
+				blockB, err := proto.Marshal(block)
+				if err != nil {
+					msg := fmt.Sprintf("block-notifier:%02d • cannot marshal block %d: %s", n.StartFromBlock, inHeight, err.Error())
+					fmt.Fprintln(n.Writer, msg)
+					return err
+				}
+
+				blockStat := stats.Block{
+					Number: inHeight,
+					Size:   float32(len(blockB)) / 1024, // Size in KiB
+				}
+				select {
+				case n.BlockChan <- blockStat:
+				default:
+				}
+
+				if LogLevel <= schema.Debug {
+					msg := fmt.Sprintf("block-notifier:%02d block:%012d • pushed block to the stats collector (len: %d)", n.StartFromBlock, int(n.MostRecentBlockHeight), len(n.BlockChan))
+					fmt.Fprintln(n.Writer, msg)
+				}
 			}
 
 			// Slot notifier

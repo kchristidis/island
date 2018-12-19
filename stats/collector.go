@@ -8,9 +8,30 @@ import (
 )
 
 // We are collecting stats on three different keys:
-// - slotNum: energy used (floa64) | hi (float64) | energy generated (float64) |  lo (float64) | energy traded (float64) |  ppu_traded (float64)
-// - blockNum: fileSize (int) -- ATTN: This has now been moved to the main thread
 // - eventID: type (string) | status (string) | latency in ms (int)
+// - blockNum: fileSize (int)
+// - slotNum: energy used (floa64) | hi (float64) | energy generated (float64) |  lo (float64) | energy traded (float64) |  ppu_traded (float64)
+
+// Transaction ...
+type Transaction struct {
+	ID              string
+	Type            string
+	Status          string
+	LatencyInMillis int64
+	Attempt         int
+}
+
+// TransactionStats ...
+var TransactionStats []Transaction
+
+// Block ...
+type Block struct {
+	Number uint64
+	Size   float32 // In KiB
+}
+
+// BlockStats ...
+var BlockStats []Block
 
 // Slot ...
 type Slot struct {
@@ -29,21 +50,9 @@ var (
 	LargestSlotSeen int
 )
 
-// Transaction ...
-type Transaction struct {
-	ID              string
-	Type            string
-	Status          string
-	LatencyInMillis int64
-	Attempt         int
-}
-
-// TransactionStats ...
-var TransactionStats []Transaction
-
 // Collector ...
 type Collector struct {
-	// BlockChan       chan Block // Input channels for stat aggregation.
+	BlockChan       chan Block // Input channels for stat aggregation.
 	SlotChan        chan Slot
 	TransactionChan chan Transaction
 
@@ -60,15 +69,21 @@ func (c *Collector) Run() {
 		select {
 		case newLine := <-c.TransactionChan:
 			c.TransactionCalc(newLine, &TransactionStats)
+		case newLine := <-c.BlockChan:
+			c.BlockCalc(newLine, &BlockStats)
 		case newLine := <-c.SlotChan:
 			c.SlotCalc(newLine, &SlotStats)
 		case <-c.DoneChan:
+			// Don't exit until you make sure that the channels are drained first
+			close(c.BlockChan)
+			for newLine := range c.BlockChan {
+				c.BlockCalc(newLine, &BlockStats)
+			}
 			close(c.TransactionChan)
 			for newLine := range c.TransactionChan {
 				c.TransactionCalc(newLine, &TransactionStats)
 			}
 			close(c.SlotChan)
-			// Don't exit until you make sure that the slot chan is drained first
 			for newLine := range c.SlotChan {
 				c.SlotCalc(newLine, &SlotStats)
 			}
@@ -79,6 +94,11 @@ func (c *Collector) Run() {
 
 // TransactionCalc ...
 func (c *Collector) TransactionCalc(newLine Transaction, aggStats *[]Transaction) {
+	*aggStats = append(*aggStats, newLine)
+}
+
+// BlockCalc ...
+func (c *Collector) BlockCalc(newLine Block, aggStats *[]Block) {
 	*aggStats = append(*aggStats, newLine)
 }
 

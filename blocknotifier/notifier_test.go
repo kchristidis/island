@@ -9,6 +9,7 @@ import (
 	"github.com/hyperledger/fabric-sdk-go/third_party/github.com/hyperledger/fabric/protos/common"
 	"github.com/kchristidis/island/blocknotifier"
 	"github.com/kchristidis/island/blocknotifier/blocknotifierfakes"
+	"github.com/kchristidis/island/stats"
 	"github.com/onsi/gomega/gbytes"
 
 	. "github.com/onsi/gomega"
@@ -17,6 +18,7 @@ import (
 func TestNotifier(t *testing.T) {
 	g := NewGomegaWithT(t)
 
+	blockc := make(chan stats.Block, 10) // A large enough buffer so that we don't have to worry about draining it.
 	slotc := make(chan int)
 
 	invoker := new(blocknotifierfakes.FakeInvoker)
@@ -36,7 +38,7 @@ func TestNotifier(t *testing.T) {
 
 		donec := make(chan struct{})
 
-		n := blocknotifier.New(blocksperslot, clockperiod, sleepduration, startfromblock, slotc, invoker, querier, bfr, donec)
+		n := blocknotifier.New(blocksperslot, clockperiod, sleepduration, startfromblock, blockc, slotc, invoker, querier, bfr, donec)
 
 		resp.BCI.Height = n.StartFromBlock - 1
 		querier.QueryInfoReturns(resp, nil)
@@ -72,7 +74,7 @@ func TestNotifier(t *testing.T) {
 
 		donec := make(chan struct{})
 
-		n := blocknotifier.New(blocksperslot, clockperiod, sleepduration, startfromblock, slotc, invoker, querier, bfr, donec)
+		n := blocknotifier.New(blocksperslot, clockperiod, sleepduration, startfromblock, blockc, slotc, invoker, querier, bfr, donec)
 
 		resp.BCI.Height = n.StartFromBlock + 1
 		querier.QueryInfoReturns(resp, nil)
@@ -110,7 +112,7 @@ func TestNotifier(t *testing.T) {
 
 		donec := make(chan struct{})
 
-		n := blocknotifier.New(blocksperslot, clockperiod, sleepduration, startfromblock, slotc, invoker, querier, bfr, donec)
+		n := blocknotifier.New(blocksperslot, clockperiod, sleepduration, startfromblock, blockc, slotc, invoker, querier, bfr, donec)
 
 		resp.BCI.Height = n.StartFromBlock + 1 + 1
 		querier.QueryInfoReturns(resp, nil)
@@ -145,7 +147,7 @@ func TestNotifier(t *testing.T) {
 
 		donec := make(chan struct{})
 
-		n := blocknotifier.New(blocksperslot, clockperiod, sleepduration, startfromblock, slotc, invoker, querier, bfr, donec)
+		n := blocknotifier.New(blocksperslot, clockperiod, sleepduration, startfromblock, blockc, slotc, invoker, querier, bfr, donec)
 
 		querier.QueryInfoReturns(nil, errors.New("foo"))
 
@@ -171,7 +173,7 @@ func TestNotifier(t *testing.T) {
 
 		donec := make(chan struct{})
 
-		n := blocknotifier.New(blocksperslot, clockperiod, sleepduration, startfromblock, slotc, invoker, querier, bfr, donec)
+		n := blocknotifier.New(blocksperslot, clockperiod, sleepduration, startfromblock, blockc, slotc, invoker, querier, bfr, donec)
 
 		n.BlockHeightOfMostRecentSlot = n.StartFromBlock
 
@@ -209,7 +211,7 @@ func TestNotifier(t *testing.T) {
 
 		donec := make(chan struct{})
 
-		n := blocknotifier.New(blocksperslot, clockperiod, sleepduration, startfromblock, slotc, invoker, querier, bfr, donec)
+		n := blocknotifier.New(blocksperslot, clockperiod, sleepduration, startfromblock, blockc, slotc, invoker, querier, bfr, donec)
 
 		n.BlockHeightOfMostRecentSlot = n.StartFromBlock
 

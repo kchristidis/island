@@ -13,6 +13,9 @@ import (
 	"github.com/kchristidis/island/stats"
 )
 
+// LogLevel is the logging level for this package.
+var LogLevel = schema.Info
+
 // BufferLen sets the buffer length for the slot and task channels.
 const BufferLen = 100
 
@@ -110,8 +113,10 @@ func (r *Regulator) Run() error {
 		return errors.New(msg)
 	}
 
-	/* msg = fmt.Sprint("regulator • registered with slot notifier")
-	fmt.Fprintln(r.Writer, msg) */
+	if LogLevel <= schema.Debug {
+		msg := fmt.Sprint("regulator • registered with slot notifier")
+		fmt.Fprintln(r.Writer, msg)
+	}
 
 	r.waitGroup.Add(1)
 	go func() {

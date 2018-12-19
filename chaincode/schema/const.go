@@ -4,7 +4,7 @@ import "time"
 
 // Experiments parameters
 const (
-	ExpNum = 1 // Identifies the experiment this chaincode is running [EDITME]
+	ExpNum = 3 // Identifies the experiment this chaincode is running.
 
 	Alpha      = 10 // The factor by which we multiply the binary exponential backoff calculation result.
 	RetryCount = 2  // The maximum number of times an agent should repeat a failed chaincode invocation.
@@ -18,4 +18,13 @@ const (
 	PostKeySuffix = "privkey" // The suffix we use for the write-key in `postKey` calls. Separate with the prefix using a dash.
 	TraceLength   = 35036     // Used to size the metrics variable
 	EnableEvents  = false     // Used to enable/disable the emission of chaincode events
+)
+
+// Level identifies a logging level.
+type Level int
+
+// Supported logging levels.
+const (
+	Debug Level = iota
+	Info
 )

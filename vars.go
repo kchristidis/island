@@ -75,6 +75,7 @@ var (
 	slotcs []chan int
 
 	// The typed conduits for agents to pipe metrics into the stats collector
+	statblockc     chan stats.Block
 	statslotc      chan stats.Slot
 	statstranc     chan stats.Transaction
 	statscollector *stats.Collector

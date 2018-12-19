@@ -28,8 +28,11 @@ func (oc *opContext) Get(keyAttrs []string) ([]byte, error) {
 		return nil, errors.New(msg)
 	}
 
-	// msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • read key w/ attributes %s successfully", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action, keyAttrs)
-	// fmt.Fprintln(w, msg)
+	if LogLevel <= schema.Debug {
+		msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • read key w/ attributes %s successfully", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action, keyAttrs)
+		fmt.Fprintln(w, msg)
+	}
+
 	return valB, nil
 }
 
@@ -50,8 +53,11 @@ func (oc *opContext) Put(keyAttrs []string, valB []byte) error {
 		return errors.New(msg)
 	}
 
-	// msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • wrote to key w/ attributes %s successfully", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action, keyAttrs)
-	// fmt.Fprintln(w, msg)
+	if LogLevel <= schema.Debug {
+		msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • wrote to key w/ attributes %s successfully", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action, keyAttrs)
+		fmt.Fprintln(w, msg)
+	}
+
 	return nil
 }
 

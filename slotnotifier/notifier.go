@@ -5,7 +5,12 @@ import (
 	"io"
 	"math/rand"
 	"sync"
+
+	"github.com/kchristidis/island/chaincode/schema"
 )
+
+// LogLevel is the logging level for this package.
+var LogLevel = schema.Info
 
 // Notifier receives slot notifications and fans them out to its subscribers.
 type Notifier struct {
@@ -68,14 +73,17 @@ func (n *Notifier) Run() {
 				n.Subs.Range(func(k, v interface{}) bool {
 					select {
 					case v.(chan int) <- n.LastVal:
-						/* id := k.(int)
-						var msg string
-						if id == -1 {
-							msg = fmt.Sprintf("slot-notifier:%02d slot:%012d • sent new slot to regulator", n.ID, newVal)
-						} else {
-							msg = fmt.Sprintf("slot-notifier:%02d slot:%012d • sent new slot to agent %d", n.ID, newVal, id)
+						if LogLevel <= schema.Debug {
+							id := k.(int)
+							var msg string
+							if id == -1 {
+								msg = fmt.Sprintf("slot-notifier:%02d slot:%012d • sent new slot to regulator", n.ID, newVal)
+							} else {
+								msg = fmt.Sprintf("slot-notifier:%02d slot:%012d • sent new slot to agent %d", n.ID, newVal, id)
+							}
+							fmt.Fprintln(n.Writer, msg)
 						}
-						fmt.Fprintln(n.Writer, msg) */
+
 						return true
 					default:
 						return false

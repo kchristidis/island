@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/kchristidis/island/chaincode/schema"
 	"github.com/kchristidis/island/stats"
 )
@@ -122,34 +121,13 @@ func metrics() error {
 	println()
 
 	fmt.Fprintln(writer, "block stats")
-
-	querier := sdkctx.LedgerClient
-	resp, err := querier.QueryInfo()
-	if err != nil {
-		msg := fmt.Sprintf("main • cannot query ledger: %s", err.Error())
-		fmt.Fprintln(writer, msg)
-		return err
-	}
-
-	height := resp.BCI.GetHeight()
-
-	for i := uint64(0); i < height; i++ {
-		block, err := querier.QueryBlock(i)
-		if err != nil {
-			msg := fmt.Sprintf("main • can get block %d's size: %s", i, err.Error())
-			fmt.Fprintln(writer, msg)
-			return err
-		}
-		blockB, err := proto.Marshal(block)
-		if err != nil {
-			msg := fmt.Sprintf("main • cannot marshal block %d: %s", i, err.Error())
-			fmt.Fprintln(writer, msg)
-			return err
-		}
-		numVal := fmt.Sprintf("%012d", i)
-		sizeVal := fmt.Sprintf("%.1f", float32(len(blockB))/1024) // ATTN: This is the size in KiB
+	for _, block := range stats.BlockStats {
+		numVal := fmt.Sprintf("%012d", block.Number)
+		sizeVal := fmt.Sprintf("%.1f", block.Size) // ATTN: This is the size in KiB
 		msg := fmt.Sprintf("[block: %s]"+
-			"\t%s KiB", numVal, sizeVal,
+			"\t%s KiB",
+			numVal,
+			sizeVal,
 		)
 		fmt.Fprintln(writer, msg)
 		if err := blockwriter.Write([]string{numVal, sizeVal}); err != nil {
