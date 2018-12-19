@@ -29,7 +29,7 @@ run:
 ##### CLEAN
 clean: env-down
 	@echo "Cleaning up..."
-	@rm -rf /tmp/island* island
+	@rm -rf /tmp/island* island volumes/*
 	@docker rm -f -v `docker ps -a --no-trunc | grep "example.com" | cut -d ' ' -f 1` 2>/dev/null || true
 	@docker rm -f -v `docker ps -a --no-trunc | grep "clark" | cut -d ' ' -f 1` 2>/dev/null || true
 	@docker rmi `docker images --no-trunc | grep "example.com" | cut -d ' ' -f 1` 2>/dev/null || true
