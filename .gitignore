@@ -20,3 +20,4 @@ vendor/*
 island
 output/*
 trace/*.csv
+volumes/*
