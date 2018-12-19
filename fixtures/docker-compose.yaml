@@ -20,8 +20,9 @@ services:
     command: orderer
     volumes:
       - ./crypto-config/ordererOrganizations/example.com/orderers/joe.example.com/msp:/var/hyperledger/orderer/msp
-      - ./crypto-config/ordererOrganizations/example.com/orderers/joe.example.com/tls/:/var/hyperledger/orderer/tls
+      - ./crypto-config/ordererOrganizations/example.com/orderers/joe.example.com/tls:/var/hyperledger/orderer/tls
       - ./artifacts/system-channel.block:/var/hyperledger/orderer/system-channel.block
+      - ../volumes/orderer:/var/hyperledger/production/orderer
     ports:
       - 7050:7050
 
