@@ -154,7 +154,7 @@ func New(invoker Invoker, slotBidNotifier Notifier, slotPostKeyNotifier Notifier
 		Notifiers: notifiers,
 
 		ID:           id,
-		Trace:        trace[:5], // [:5] for debugging, [:5760] for production
+		Trace:        trace[:5760], // [:5] for debugging, [:5760] for production
 		PrivKeyBytes: privKeyBytes,
 
 		SlotChan:        slotc,

@@ -123,8 +123,8 @@ func run() error {
 		wg2.Done()
 	}()
 
-	// for i, ID := range trace.IDs {
-	for i, ID := range []int{171, 1103} { // For debugging only
+	for i, ID := range trace.IDs {
+	// for i, ID := range []int{171, 1103} { // For debugging only
 		bidders[i] = bidder.New(sdkctx, snotifiers[0], snotifiers[1],
 			ID, privkeybytes, tracemap[ID],
 			statslotc, statstranc, writer, donec)
