@@ -130,7 +130,7 @@ func (n *Notifier) Run() error {
 		default:
 			resp, err := n.Querier.QueryInfo()
 			if err != nil {
-				msg := fmt.Sprintf("block-notifier:%02d • cannot query ledger: %s", n.StartFromBlock, err.Error())
+				msg = fmt.Sprintf("block-notifier:%02d • cannot query ledger: %s", n.StartFromBlock, err.Error())
 				fmt.Fprintln(n.Writer, msg)
 				return err
 			}
@@ -140,35 +140,46 @@ func (n *Notifier) Run() error {
 				n.MostRecentBlockHeight = inHeight
 
 				if LogLevel <= schema.Debug {
-					msg := fmt.Sprintf("block-notifier:%02d block:%012d • block committed at the peer", n.StartFromBlock, int(n.MostRecentBlockHeight))
+					msg = fmt.Sprintf("block-notifier:%02d block:%012d • block committed at the peer", n.StartFromBlock, int(n.MostRecentBlockHeight))
 					fmt.Fprintln(n.Writer, msg)
 				}
 
-				block, err := n.Querier.QueryBlock(inHeight)
-				if err != nil {
-					msg := fmt.Sprintf("block-notifier:%02d • cannot get block %d's size: %s", n.StartFromBlock, inHeight, err.Error())
-					fmt.Fprintln(n.Writer, msg)
-					return err
-				}
-				blockB, err := proto.Marshal(block)
-				if err != nil {
-					msg := fmt.Sprintf("block-notifier:%02d • cannot marshal block %d: %s", n.StartFromBlock, inHeight, err.Error())
-					fmt.Fprintln(n.Writer, msg)
-					return err
-				}
+				/*
+					As a temporary solution to this problem "cannot get block 59797's size:
+					QueryBlock failed: Transaction processing for endorser [localhost:7051]:
+					Chaincode status Code: (500) UNKNOWN. Description: Failed to get block
+					number 59797, error Error getting envelope(unexpected EOF)" - query a
+					lagging height.
+				*/
 
-				blockStat := stats.Block{
-					Number: inHeight,
-					Size:   float32(len(blockB)) / 1024, // Size in KiB
-				}
-				select {
-				case n.BlockChan <- blockStat:
-				default:
-				}
+				if inHeight >= n.StartFromBlock {
+					laggingHeight := inHeight - n.StartFromBlock
+					block, err := n.Querier.QueryBlock(laggingHeight)
+					if err != nil {
+						msg = fmt.Sprintf("block-notifier:%02d • cannot get block %d's size: %s", n.StartFromBlock, laggingHeight, err.Error())
+						fmt.Fprintln(n.Writer, msg)
+						return err
+					}
+					blockB, err := proto.Marshal(block)
+					if err != nil {
+						msg = fmt.Sprintf("block-notifier:%02d • cannot marshal block %d: %s", n.StartFromBlock, laggingHeight, err.Error())
+						fmt.Fprintln(n.Writer, msg)
+						return err
+					}
 
-				if LogLevel <= schema.Debug {
-					msg := fmt.Sprintf("block-notifier:%02d block:%012d • pushed block to the stats collector (len: %d)", n.StartFromBlock, int(n.MostRecentBlockHeight), len(n.BlockChan))
-					fmt.Fprintln(n.Writer, msg)
+					blockStat := stats.Block{
+						Number: laggingHeight,
+						Size:   float32(len(blockB)) / 1024, // Size in KiB
+					}
+					select {
+					case n.BlockChan <- blockStat:
+					default:
+					}
+
+					if LogLevel <= schema.Debug {
+						msg = fmt.Sprintf("block-notifier:%02d block:%012d • pushed block to the stats collector (len: %d)", n.StartFromBlock, laggingHeight, len(n.BlockChan))
+						fmt.Fprintln(n.Writer, msg)
+					}
 				}
 			}
 
@@ -180,7 +191,7 @@ func (n *Notifier) Run() error {
 				}
 
 				if inHeight != n.StartFromBlock {
-					msg := fmt.Sprintf("bloc-knotifier:%02d block:%012d • expected block %012d as start block", n.StartFromBlock, inHeight, n.StartFromBlock)
+					msg = fmt.Sprintf("block-notifier:%02d block:%012d • expected block %012d as start block", n.StartFromBlock, inHeight, n.StartFromBlock)
 					fmt.Println(n.Writer, msg)
 					return fmt.Errorf(msg)
 				}
