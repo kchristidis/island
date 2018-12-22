@@ -146,12 +146,17 @@ func New(invoker Invoker, slotBidNotifier Notifier, slotPostKeyNotifier Notifier
 	s = rand.NewSource(time.Now().UnixNano())
 	r = rand.New(s)
 
+	subTrace := trace[:5760]
+	if schema.StagingLevel <= schema.Debug {
+		subTrace = trace[:5]
+	}
+
 	return &Bidder{
 		Invoker:   invoker,
 		Notifiers: notifiers,
 
 		ID:           id,
-		Trace:        trace[:5760], // [:5] for debugging, [:5760] for production
+		Trace:        subTrace,
 		PrivKeyBytes: privKeyBytes,
 
 		SlotChan:        slotc,
