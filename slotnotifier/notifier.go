@@ -9,9 +9,6 @@ import (
 	"github.com/kchristidis/island/chaincode/schema"
 )
 
-// LogLevel is the logging level for this package.
-var LogLevel = schema.Info
-
 // Notifier receives slot notifications and fans them out to its subscribers.
 type Notifier struct {
 	SourceChan <-chan int
@@ -73,7 +70,7 @@ func (n *Notifier) Run() {
 				n.Subs.Range(func(k, v interface{}) bool {
 					select {
 					case v.(chan int) <- n.LastVal:
-						if LogLevel <= schema.Debug {
+						if schema.StagingLevel <= schema.Debug {
 							id := k.(int)
 							var msg string
 							if id == -1 {

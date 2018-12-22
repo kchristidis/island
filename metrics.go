@@ -93,9 +93,11 @@ func metrics() error {
 		return nil
 	}()
 
-	println()
+	if schema.StagingLevel <= schema.Debug {
+		println()
+		fmt.Fprintln(writer, "transaction stats")
+	}
 
-	fmt.Fprintln(writer, "transaction stats")
 	for _, tx := range stats.TransactionStats {
 		idNum, _ := strconv.Atoi(tx.ID)
 		idVal := fmt.Sprintf("%012d", idNum)
@@ -112,15 +114,19 @@ func metrics() error {
 			attVal,
 			tx.Status,
 		)
-		fmt.Fprintln(writer, msg)
+		if schema.StagingLevel <= schema.Debug {
+			fmt.Fprintln(writer, msg)
+		}
 		if err := tranwriter.Write([]string{idVal, latVal, tx.Type, attVal, tx.Status}); err != nil {
 			return err
 		}
 	}
 
-	println()
+	if schema.StagingLevel <= schema.Debug {
+		println()
+		fmt.Fprintln(writer, "block stats")
+	}
 
-	fmt.Fprintln(writer, "block stats")
 	for _, block := range stats.BlockStats {
 		numVal := fmt.Sprintf("%012d", block.Number)
 		sizeVal := fmt.Sprintf("%.1f", block.Size) // ATTN: This is the size in KiB
@@ -129,7 +135,9 @@ func metrics() error {
 			numVal,
 			sizeVal,
 		)
-		fmt.Fprintln(writer, msg)
+		if schema.StagingLevel <= schema.Debug {
+			fmt.Fprintln(writer, msg)
+		}
 		if err := blockwriter.Write([]string{numVal, sizeVal}); err != nil {
 			return err
 		}

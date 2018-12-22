@@ -18,13 +18,15 @@ const (
 	PostKeySuffix = "privkey" // The suffix we use for the write-key in `postKey` calls. Separate with the prefix using a dash.
 	TraceLength   = 35036     // Used to size the metrics variable
 	EnableEvents  = false     // Used to enable/disable the emission of chaincode events
+
+	StagingLevel = Debug // Identifies the staging level for the experiment.
 )
 
-// Level identifies a logging level.
+// Level identifies a staging level.
 type Level int
 
-// Supported logging levels.
+// Supported staging levels.
 const (
 	Debug Level = iota
-	Info
+	Prod
 )

@@ -28,7 +28,7 @@ func (oc *opContext) Get(keyAttrs []string) ([]byte, error) {
 		return nil, errors.New(msg)
 	}
 
-	if LogLevel <= schema.Debug {
+	if schema.StagingLevel <= schema.Debug {
 		msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • read key w/ attributes %s successfully", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action, keyAttrs)
 		fmt.Fprintln(w, msg)
 	}
@@ -53,7 +53,7 @@ func (oc *opContext) Put(keyAttrs []string, valB []byte) error {
 		return errors.New(msg)
 	}
 
-	if LogLevel <= schema.Debug {
+	if schema.StagingLevel <= schema.Debug {
 		msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • wrote to key w/ attributes %s successfully", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action, keyAttrs)
 		fmt.Fprintln(w, msg)
 	}

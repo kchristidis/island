@@ -17,9 +17,6 @@ import (
 	"github.com/kchristidis/island/stats"
 )
 
-// LogLevel is the logging level for this package.
-var LogLevel = schema.Info
-
 // The column names in the trace
 const (
 	Gen = iota
@@ -195,7 +192,7 @@ func (b *Bidder) Run() error {
 			return errors.New(msg)
 		}
 
-		if LogLevel <= schema.Debug {
+		if schema.StagingLevel <= schema.Debug {
 			msg := fmt.Sprintf("bidder:%04d • registered with slot notifier %d", b.ID, i)
 			fmt.Fprintln(b.Writer, msg)
 		}
@@ -280,7 +277,7 @@ func (b *Bidder) Run() error {
 		case bidSlot := <-b.SlotQueues[0]:
 			rowIdx := int(bidSlot)
 
-			if LogLevel <= schema.Debug {
+			if schema.StagingLevel <= schema.Debug {
 				msg := fmt.Sprintf("bidder:%04d slot:%012d • new slot! processing row %d for bidding: %v", b.ID, bidSlot, rowIdx, b.Trace[rowIdx])
 				fmt.Fprintln(b.Writer, msg)
 			}
@@ -308,7 +305,7 @@ func (b *Bidder) Run() error {
 		case postKeySlot := <-b.SlotQueues[1]:
 			rowIdx := int(postKeySlot)
 
-			if LogLevel <= schema.Debug {
+			if schema.StagingLevel <= schema.Debug {
 				msg := fmt.Sprintf("bidder:%04d slot:%012d • new slot! processing row %d for key posting: %v", b.ID, postKeySlot, rowIdx, b.Trace[rowIdx])
 				fmt.Fprintln(b.Writer, msg)
 			}
@@ -583,7 +580,7 @@ func (b *Bidder) Sell(rowIdx int) error {
 // PostKey allows a bidder to post the private key corresponding to the
 // public key with which they posted an encrypted bid on the ledger.
 func (b *Bidder) PostKey(rowIdx int) error {
-	if LogLevel <= schema.Debug {
+	if schema.StagingLevel <= schema.Debug {
 		msg := fmt.Sprintf("bidder:%04d slot:%012d • about to invoke 'postKey'", b.ID, rowIdx)
 		fmt.Fprintln(b.Writer, msg)
 	}
@@ -604,7 +601,7 @@ func (b *Bidder) PostKey(rowIdx int) error {
 		return errors.New(msg)
 	}
 
-	if LogLevel <= schema.Debug {
+	if schema.StagingLevel <= schema.Debug {
 		msg := fmt.Sprintf("bidder:%04d slot:%012d • found %d bids to post keys for", b.ID, rowIdx, len(valMap.(map[string][]string)))
 		fmt.Fprintln(b.Writer, msg)
 	}

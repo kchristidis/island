@@ -16,9 +16,6 @@ import (
 	"github.com/kchristidis/island/stats"
 )
 
-// LogLevel is the logging level for this package.
-var LogLevel = schema.Info
-
 //go:generate counterfeiter . Invoker
 
 // Invoker is an interface that encapsulates the
@@ -139,7 +136,7 @@ func (n *Notifier) Run() error {
 			if inHeight > n.MostRecentBlockHeight {
 				n.MostRecentBlockHeight = inHeight
 
-				if LogLevel <= schema.Debug {
+				if schema.StagingLevel <= schema.Debug {
 					msg = fmt.Sprintf("block-notifier:%02d block:%012d • block committed at the peer", n.StartFromBlock, int(n.MostRecentBlockHeight))
 					fmt.Fprintln(n.Writer, msg)
 				}
@@ -176,7 +173,7 @@ func (n *Notifier) Run() error {
 					default:
 					}
 
-					if LogLevel <= schema.Debug {
+					if schema.StagingLevel <= schema.Debug {
 						msg = fmt.Sprintf("block-notifier:%02d block:%012d • pushed block to the stats collector (len: %d)", n.StartFromBlock, laggingHeight, len(n.BlockChan))
 						fmt.Fprintln(n.Writer, msg)
 					}
