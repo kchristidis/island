@@ -20,7 +20,7 @@ vagrant plugin install vagrant-disksize
 
 ## Setup
 
-Clone the forked `fabric` repo and the `island` repos:
+Clone the forked `fabric` repo and the `island` repo:
 
 ```bash
 git clone git@github.com:kchristidis/fabric.git
