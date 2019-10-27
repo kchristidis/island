@@ -33,7 +33,7 @@ type Querier interface {
 	QueryInfo(opts ...ledger.RequestOption) (*fab.BlockchainInfoResponse, error)
 }
 
-// Notifier queries a ledger for new block and posts slot notifications
+// Notifier queries a ledger for new blocks, and posts slot notifications
 // whenever the block that marks the beginning of a new slot is received.
 type Notifier struct {
 	BlocksPerSlot  int           // How many blocks constitute a slot in our experiment?
@@ -56,7 +56,7 @@ type Notifier struct {
 
 	DoneChan  chan struct{}   // An external kill switch. Signals to all threads in this package that they should return.
 	killChan  chan struct{}   // An internal kill switch. It can only be closed by this package, and it signals to the package's goroutines that they should exit.
-	waitGroup *sync.WaitGroup // Ensures that the main thread in this package doesn't return before the goroutines it spawned also have as well.
+	waitGroup *sync.WaitGroup // Ensures that the main thread in this package doesn't return before the goroutines it spawned have.
 }
 
 // New returns a new notifier.
@@ -145,7 +145,7 @@ func (n *Notifier) Run() error {
 					As a temporary solution to this problem "cannot get block 59797's size:
 					QueryBlock failed: Transaction processing for endorser [localhost:7051]:
 					Chaincode status Code: (500) UNKNOWN. Description: Failed to get block
-					number 59797, error Error getting envelope(unexpected EOF)" - query a
+					number 59797, error Error getting envelope(unexpected EOF)", we query a
 					lagging height.
 				*/
 
@@ -193,7 +193,7 @@ func (n *Notifier) Run() error {
 					return fmt.Errorf(msg)
 				}
 
-				n.MostRecentSlot = int(inHeight - n.StartFromBlock) // should be 0
+				n.MostRecentSlot = int(inHeight - n.StartFromBlock) // This should be 0
 				n.BlockHeightOfMostRecentSlot = inHeight
 				msg = fmt.Sprintf("block-notifier:%02d block:%012d • new slot! block corresponds to slot %012d", n.StartFromBlock, inHeight, n.MostRecentSlot)
 				fmt.Fprintln(n.Writer, msg)

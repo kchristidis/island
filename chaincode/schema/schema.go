@@ -24,7 +24,7 @@ type ClockOutput struct {
 type OpContextInput struct {
 	EventID string
 	Action  string
-	Slot    int    // Not need for `metrics` query, or `clock`
+	Slot    int    // Not needed for `metrics` query, or `clock`
 	Data    []byte // Not needed for `metrics` query, or `clock`
 }
 

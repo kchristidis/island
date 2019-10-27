@@ -16,8 +16,8 @@ const (
 	SleepDuration = 100 * time.Millisecond // How often do we check for new blocks?
 
 	PostKeySuffix = "privkey" // The suffix we use for the write-key in `postKey` calls. Separate with the prefix using a dash.
-	TraceLength   = 35036     // Used to size the metrics variable
-	EnableEvents  = false     // Used to enable/disable the emission of chaincode events
+	TraceLength   = 35036     // Used to size the metrics variable.
+	EnableEvents  = false     // Used to enable/disable the emission of chaincode events.
 
 	StagingLevel = Debug // Identifies the staging level for the experiment.
 )

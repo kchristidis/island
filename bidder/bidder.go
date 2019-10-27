@@ -82,9 +82,8 @@ type Bidder struct {
 	// SlotQueue (optional) is used for PostKey calls.
 	SlotQueues [2]chan int
 	// Used to decouple bids and PostKey calls from the main thread
-	BuyQueue  chan int
-	SellQueue chan int
-
+	BuyQueue     chan int
+	SellQueue    chan int
 	PostKeyQueue chan int
 	// Maintains a mapping between the bid for a rowIdx (key) and the
 	// associated event ID and write-key in the chaincode's KVS. We write
@@ -101,7 +100,7 @@ type Bidder struct {
 	// and it signals to the package's goroutines that they should exit.
 	killChan chan struct{}
 	// Ensures that the main thread in this package doesn't return
-	// before the goroutines it spawned also have as well.
+	// before the goroutines it spawned have.
 	waitGroup *sync.WaitGroup
 
 	// Handy references to the private and public keys
@@ -112,7 +111,7 @@ type Bidder struct {
 // New returns a new bidder.
 func New(invoker Invoker, slotBidNotifier Notifier, slotPostKeyNotifier Notifier,
 	id int, privKeyBytes []byte, trace [][]float64,
-	slotc chan stats.Slot, transactionc chan stats.Transaction,
+	slotC chan stats.Slot, transactionC chan stats.Transaction,
 	writer io.Writer, donec chan struct{}) *Bidder {
 
 	notifiers := []Notifier{slotBidNotifier}
@@ -132,13 +131,13 @@ func New(invoker Invoker, slotBidNotifier Notifier, slotPostKeyNotifier Notifier
 	}
 	pubKey := &privKey.PublicKey
 
-	var slotqs [2]chan int
+	var slotQs [2]chan int
 	// Create two SlotQueues no matter what.
 	// If len(notifiers) == 1, we will nil the second
 	// SlotQueue before the for-select loop in the main
 	// thread below.
 	for i := 0; i < 2; i++ {
-		slotqs[i] = make(chan int, BufferLen)
+		slotQs[i] = make(chan int, BufferLen)
 	}
 
 	cmapKeys, _ := cmap.New(BufferLen)
@@ -148,7 +147,7 @@ func New(invoker Invoker, slotBidNotifier Notifier, slotPostKeyNotifier Notifier
 
 	subTrace := trace[:5760]
 	if schema.StagingLevel <= schema.Debug {
-		subTrace = trace[:5]
+		subTrace = trace[:5] // We only care about the first 5 values.
 	}
 
 	return &Bidder{
@@ -159,10 +158,10 @@ func New(invoker Invoker, slotBidNotifier Notifier, slotPostKeyNotifier Notifier
 		Trace:        subTrace,
 		PrivKeyBytes: privKeyBytes,
 
-		SlotChan:        slotc,
-		TransactionChan: transactionc,
+		SlotChan:        slotC,
+		TransactionChan: transactionC,
 
-		SlotQueues:         slotqs,
+		SlotQueues:         slotQs,
 		BuyQueue:           make(chan int, BufferLen),
 		SellQueue:          make(chan int, BufferLen),
 		PostKeyQueue:       make(chan int, BufferLen),
@@ -320,7 +319,7 @@ func (b *Bidder) Run() error {
 			// A side-effect of calling for a 'postKey' call like this is that we may ask to
 			// 'postKey' for slot N when the relevant bid/sell call is still being repeated.
 			// We could probably mitigate this by tighter synchronization between the buy/sell
-			// goroutines and the postkey one, but this would complicate the codebase significantly.
+			// goroutines and the postkey one, but this would complicate the code significantly.
 			case b.PostKeyQueue <- rowIdx:
 			default:
 				msg := fmt.Sprintf("bidder:%04d slot:%012d • cannot push row to 'postKey' queue (size: %d)", b.ID, rowIdx, len(b.PostKeyQueue))

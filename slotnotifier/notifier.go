@@ -80,7 +80,6 @@ func (n *Notifier) Run() {
 							}
 							fmt.Fprintln(n.Writer, msg)
 						}
-
 						return true
 					default:
 						return false

@@ -8,17 +8,17 @@ import (
 	"strconv"
 )
 
-// Filename ...
+// Filename points to the input trace.
 const Filename = "04-final-trace-2013.csv"
 
-// ...
+// Dimensions of the input trace.
 const (
 	IDCount  = 63
 	RowCount = 35036 // per ID
 	ColCount = 6
 )
 
-// ...
+// Column headers of the input trace.
 const (
 	DataID = iota
 	Gen
@@ -28,7 +28,7 @@ const (
 	Hi
 )
 
-// IDs ...
+// IDs lists all the data IDs in the input trace.
 var IDs = []int{
 	171, 1103, 1283, 1718, 1792, 370, 2072, 2233, 2337, 2470, 2755,
 	2818, 2925, 2945, 2980, 2986, 3224, 3456, 3527, 3544, 3635, 3719,
@@ -38,7 +38,7 @@ var IDs = []int{
 	7863, 7989, 8084, 8155, 8626, 8829, 9121, 9631,
 }
 
-// Load ...
+// Load a CSV file into a map.
 func Load(fname string) (map[int][][]float64, error) {
 	b, err := ioutil.ReadFile(fname)
 	if err != nil {
@@ -67,7 +67,7 @@ func Load(fname string) (map[int][][]float64, error) {
 	return Convert(m)
 }
 
-// Convert ...
+// Convert a map from one type to another.
 func Convert(m1 map[string][][]string) (map[int][][]float64, error) {
 	m2 := make(map[int][][]float64)
 

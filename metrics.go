@@ -21,7 +21,7 @@ func metrics() error {
 
 	msg = fmt.Sprint("main • closing donestatsc...")
 	fmt.Fprintln(writer, msg)
-	close(donestatsc)
+	close(doneStatsC)
 	wg3.Wait()
 
 	// Create the output dir if it doesn't exist already
@@ -31,50 +31,50 @@ func metrics() error {
 		}
 	}
 
-	tranfile, err := os.Create(filepath.Join(OutputDir, fmt.Sprintf("%s-%s", outputprefix, OutputTran)))
+	tranFile, err := os.Create(filepath.Join(OutputDir, fmt.Sprintf("%s-%s", outputPrefix, OutputTran)))
 	if err != nil {
 		return err
 	}
-	defer tranfile.Close()
+	defer tranFile.Close()
 
-	tranwriter := csv.NewWriter(tranfile)
-	if err := tranwriter.Write([]string{"tx_id", "latency_ms", "tx_type", "attempt", "tx_status"}); err != nil {
+	tranWriter := csv.NewWriter(tranFile)
+	if err := tranWriter.Write([]string{"tx_id", "latency_ms", "tx_type", "attempt", "tx_status"}); err != nil {
 		return err
 	}
 	defer func() error {
-		tranwriter.Flush()
-		if err := tranwriter.Error(); err != nil {
+		tranWriter.Flush()
+		if err := tranWriter.Error(); err != nil {
 			return err
 		}
 		return nil
 	}()
 
-	blockfile, err := os.Create(filepath.Join(OutputDir, fmt.Sprintf("%s-%s", outputprefix, OutputBlock)))
+	blockFile, err := os.Create(filepath.Join(OutputDir, fmt.Sprintf("%s-%s", outputPrefix, OutputBlock)))
 	if err != nil {
 		return err
 	}
-	defer blockfile.Close()
+	defer blockFile.Close()
 
-	blockwriter := csv.NewWriter(blockfile)
-	if err := blockwriter.Write([]string{"block_num", "size_kib"}); err != nil {
+	blockWriter := csv.NewWriter(blockFile)
+	if err := blockWriter.Write([]string{"block_num", "size_kib"}); err != nil {
 		return err
 	}
 	defer func() error {
-		blockwriter.Flush()
-		if err := blockwriter.Error(); err != nil {
+		blockWriter.Flush()
+		if err := blockWriter.Error(); err != nil {
 			return err
 		}
 		return nil
 	}()
 
-	slotfile, err := os.Create(filepath.Join(OutputDir, fmt.Sprintf("%s-%s", outputprefix, OutputSlot)))
+	slotFile, err := os.Create(filepath.Join(OutputDir, fmt.Sprintf("%s-%s", outputPrefix, OutputSlot)))
 	if err != nil {
 		return err
 	}
-	defer slotfile.Close()
+	defer slotFile.Close()
 
-	slotwriter := csv.NewWriter(slotfile)
-	if err := slotwriter.Write([]string{"slot_num",
+	slotWriter := csv.NewWriter(slotFile)
+	if err := slotWriter.Write([]string{"slot_num",
 		"bfg_qty_kwh", "bfg_ppu_c_per_kWh)", // bfg = bought from grid
 		"stg_qty_kwh", "stg_ppu_c_per_kWh)", // stg = sold to grid
 		"dmi_qty_kwh", "dmi_ppu_c_per_kWh)", // dmi = demand met internally
@@ -86,8 +86,8 @@ func metrics() error {
 		return err
 	}
 	defer func() error {
-		slotwriter.Flush()
-		if err := slotwriter.Error(); err != nil {
+		slotWriter.Flush()
+		if err := slotWriter.Error(); err != nil {
 			return err
 		}
 		return nil
@@ -117,7 +117,7 @@ func metrics() error {
 		if schema.StagingLevel <= schema.Debug {
 			fmt.Fprintln(writer, msg)
 		}
-		if err := tranwriter.Write([]string{idVal, latVal, tx.Type, attVal, tx.Status}); err != nil {
+		if err := tranWriter.Write([]string{idVal, latVal, tx.Type, attVal, tx.Status}); err != nil {
 			return err
 		}
 	}
@@ -138,7 +138,7 @@ func metrics() error {
 		if schema.StagingLevel <= schema.Debug {
 			fmt.Fprintln(writer, msg)
 		}
-		if err := blockwriter.Write([]string{numVal, sizeVal}); err != nil {
+		if err := blockWriter.Write([]string{numVal, sizeVal}); err != nil {
 			return err
 		}
 	}
@@ -212,7 +212,7 @@ func metrics() error {
 		)
 		fmt.Fprintln(writer, msg)
 
-		if err := slotwriter.Write([]string{slotVal,
+		if err := slotWriter.Write([]string{slotVal,
 			bfgQtyVal, bfgPpuVal,
 			stgQtyVal, stgPpuVal,
 			dmiQtyVal, dmiPpuVal,
@@ -229,7 +229,7 @@ func metrics() error {
 	msg = fmt.Sprintf("main • number of goroutines still running: %d", runtime.NumGoroutine())
 	fmt.Fprintln(writer, msg)
 
-	msg = fmt.Sprintf("main • run completed in %s", time.Now().Sub(timestart))
+	msg = fmt.Sprintf("main • run completed in %s", time.Now().Sub(timeStart))
 	fmt.Fprintln(writer, msg)
 
 	return nil

@@ -63,7 +63,7 @@ type Regulator struct {
 	// and it signals to the package's goroutines that they should exit.
 	killChan chan struct{}
 	// Ensures that the main thread in this package doesn't return
-	// before the goroutines it spawned also have as well.
+	// before the goroutines it spawned have.
 	waitGroup *sync.WaitGroup
 }
 

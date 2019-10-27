@@ -6,11 +6,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/kchristidis/island/chaincode/schema"
-
 	"github.com/kchristidis/island/bidder"
 	"github.com/kchristidis/island/blockchain"
 	"github.com/kchristidis/island/blocknotifier"
+	"github.com/kchristidis/island/chaincode/schema"
 	"github.com/kchristidis/island/crypto"
 	"github.com/kchristidis/island/regulator"
 	"github.com/kchristidis/island/slotnotifier"
@@ -28,31 +27,31 @@ func main() {
 func run() error {
 	writer = os.Stdout
 	iter++
-	outputprefix = fmt.Sprintf("exp-%02d-run-%02d", schema.ExpNum, iter)
+	outputPrefix = fmt.Sprintf("exp-%02d-run-%02d", schema.ExpNum, iter)
 
-	timestart = time.Now()
+	timeStart = time.Now()
 
-	startfromblock = uint64(10)
+	startFromBlock = uint64(10)
 
-	statblockc = make(chan stats.Block, StatChannelBuffer)
-	statslotc = make(chan stats.Slot, StatChannelBuffer)
-	statstranc = make(chan stats.Transaction, StatChannelBuffer)
+	statsBlockC = make(chan stats.Block, StatChannelBuffer)
+	statsSlotC = make(chan stats.Slot, StatChannelBuffer)
+	statsTranC = make(chan stats.Transaction, StatChannelBuffer)
 
-	donec = make(chan struct{})
-	donestatsc = make(chan struct{})
+	doneC = make(chan struct{})
+	doneStatsC = make(chan struct{})
 
-	tracepath := filepath.Join("trace", trace.Filename)
-	tracemap, err = trace.Load(tracepath)
+	tracePath := filepath.Join("trace", trace.Filename)
+	traceMap, err = trace.Load(tracePath)
 	if err != nil {
 		return nil
 	}
 
-	privkeypath := filepath.Join("crypto", "priv.pem")
-	privkey, err = crypto.LoadPrivate(privkeypath)
+	privKeyPath := filepath.Join("crypto", "priv.pem")
+	privKey, err = crypto.LoadPrivate(privKeyPath)
 	if err != nil {
 		return nil
 	}
-	privkeybytes := crypto.SerializePrivate(privkey)
+	privKeyBytes := crypto.SerializePrivate(privKey)
 
 	// Begin initializations
 
@@ -84,16 +83,16 @@ func run() error {
 		return err
 	}
 
-	statscollector = &stats.Collector{
-		BlockChan:       statblockc,
-		SlotChan:        statslotc,
-		TransactionChan: statstranc,
+	statsCollector = &stats.Collector{
+		BlockChan:       statsBlockC,
+		SlotChan:        statsSlotC,
+		TransactionChan: statsTranC,
 		Writer:          writer,
-		DoneChan:        donestatsc,
+		DoneChan:        doneStatsC,
 	}
 	wg3.Add(1)
 	go func() {
-		statscollector.Run()
+		statsCollector.Run()
 		wg3.Done()
 	}()
 
@@ -102,22 +101,24 @@ func run() error {
 		for i := 0; i < 2; i++ {
 			// 1st for markend+bid calls
 			// 2nd one for postkey calls
-			slotcs = append(slotcs, make(chan int))
-			snotifiers = append(snotifiers, slotnotifier.New(slotcs[i], writer, donec))
+			slotCs = append(slotCs, make(chan int))
+			sNotifiers = append(sNotifiers, slotnotifier.New(slotCs[i], writer, doneC))
 		}
 	case 2:
-		slotcs = append(slotcs, make(chan int))
-		snotifiers = []*slotnotifier.Notifier{slotnotifier.New(slotcs[0], writer, donec), nil}
+		slotCs = append(slotCs, make(chan int))
+		sNotifiers = []*slotnotifier.Notifier{slotnotifier.New(slotCs[0], writer, doneC), nil}
 	}
 
-	regtor = regulator.New(sdkctx, snotifiers[0], privkeybytes, statslotc, statstranc, writer, donec)
+	regtor = regulator.New(sdkctx, sNotifiers[0],
+		privKeyBytes,
+		statsSlotC, statsTranC, writer, doneC)
 	wg2.Add(1)
 	go func() {
 		if err := regtor.Run(); err != nil {
 			once.Do(func() {
 				msg := fmt.Sprint("regulator • closing donec")
 				fmt.Fprintln(writer, msg)
-				close(donec)
+				close(doneC)
 			})
 		}
 		wg2.Done()
@@ -125,66 +126,66 @@ func run() error {
 
 	biddersList := trace.IDs
 	if schema.StagingLevel <= schema.Debug {
-		biddersList = []int{171, 1103}
+		biddersList = biddersList[:2]
 	}
 
 	for i, ID := range biddersList {
-		bidders[i] = bidder.New(sdkctx, snotifiers[0], snotifiers[1],
-			ID, privkeybytes, tracemap[ID],
-			statslotc, statstranc, writer, donec)
+		bidders[i] = bidder.New(sdkctx, sNotifiers[0], sNotifiers[1],
+			ID, privKeyBytes, traceMap[ID],
+			statsSlotC, statsTranC, writer, doneC)
 		wg1.Add(1)
 		go func(i int) {
 			if err = bidders[i].Run(); err != nil {
 				once.Do(func() {
 					msg := fmt.Sprintf("bidder:%04d • closing donec", bidders[i].ID)
 					fmt.Fprintln(writer, msg)
-					close(donec)
+					close(doneC)
 				})
 			}
 			wg1.Done()
 		}(i)
 	}
 
-	// The size of the slotcs slice dictates how many block notifiers we need
+	// The size of the slotCs slice dictates how many block notifiers we need
 
-	bnotifiers = append(bnotifiers, blocknotifier.New(
-		schema.BlocksPerSlot, schema.ClockPeriod, schema.SleepDuration, startfromblock,
-		statblockc, slotcs[0],
+	bNotifiers = append(bNotifiers, blocknotifier.New(
+		schema.BlocksPerSlot, schema.ClockPeriod, schema.SleepDuration, startFromBlock,
+		statsBlockC, slotCs[0],
 		sdkctx, sdkctx.LedgerClient,
-		writer, donec,
+		writer, doneC,
 	))
 
-	if len(slotcs) > 1 {
-		nilchan := make(chan stats.Block) // This ensures that only the first blocknotifier feeds the stats collector
-		bnotifiers = append(bnotifiers, blocknotifier.New(
-			schema.BlocksPerSlot, schema.ClockPeriod, schema.SleepDuration, startfromblock+uint64(schema.BlockOffset),
-			nilchan, slotcs[1],
+	if len(slotCs) > 1 {
+		nilChan := make(chan stats.Block) // This ensures that only the first blockNotifier feeds the stats collector
+		bNotifiers = append(bNotifiers, blocknotifier.New(
+			schema.BlocksPerSlot, schema.ClockPeriod, schema.SleepDuration, startFromBlock+uint64(schema.BlockOffset),
+			nilChan, slotCs[1],
 			sdkctx, sdkctx.LedgerClient,
-			writer, donec,
+			writer, doneC,
 		))
 	}
 
-	for i := range bnotifiers {
+	for i := range bNotifiers {
 		wg2.Add(1)
 		go func(i int) {
-			if err := bnotifiers[i].Run(); err != nil {
+			if err := bNotifiers[i].Run(); err != nil {
 				once.Do(func() {
 					msg := fmt.Sprintf("block-notifier:%d • closing donec", i)
 					fmt.Fprintln(writer, msg)
-					close(donec)
+					close(doneC)
 				})
 			}
 			wg2.Done()
 		}(i)
 	}
 
-	for i := range snotifiers {
-		if snotifiers[i] == nil {
+	for i := range sNotifiers {
+		if sNotifiers[i] == nil {
 			continue
 		}
 		wg2.Add(1)
 		go func(i int) {
-			snotifiers[i].Run()
+			sNotifiers[i].Run()
 			wg2.Done()
 		}(i)
 	}
@@ -192,7 +193,7 @@ func run() error {
 	// Start the simulation
 
 	// In the green path, the *bidders* will run their entire trace, then exit.
-	// We then close `donec`, then wait for all the other goroutines to conclude.
+	// We then close `doneC`, and wait for all the other goroutines to conclude.
 	// This is why we use two separate waitgroups: one for bidders, and one for
 	// regulator/notifiers.
 	// An unfortunate side-effect of this design is that we do not let the regulator
@@ -205,7 +206,7 @@ func run() error {
 	once.Do(func() {
 		msg := fmt.Sprint("main • closing donec")
 		fmt.Fprintln(writer, msg)
-		close(donec)
+		close(doneC)
 	})
 
 	wg2.Wait()
