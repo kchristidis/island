@@ -75,9 +75,9 @@ func metrics() error {
 
 	slotWriter := csv.NewWriter(slotFile)
 	if err := slotWriter.Write([]string{"slot_num",
-		"bfg_qty_kwh", "bfg_ppu_c_per_kWh)", // bfg = bought from grid
-		"stg_qty_kwh", "stg_ppu_c_per_kWh)", // stg = sold to grid
-		"dmi_qty_kwh", "dmi_ppu_c_per_kWh)", // dmi = demand met internally
+		"bfg_qty_kwh", "bfg_ppu_c_per_kWh", // bfg = bought from grid
+		"stg_qty_kwh", "stg_ppu_c_per_kWh", // stg = sold to grid
+		"dmi_qty_kwh", "dmi_ppu_c_per_kWh", // dmi = demand met internally
 		"late_cnt_all", "late_cnt_buy", "late_cnt_sell",
 		"late_decrs",
 		"prob_iters", "prob_marshals",
