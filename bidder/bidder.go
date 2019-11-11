@@ -521,7 +521,7 @@ func (b *Bidder) Sell(rowIdx int) error {
 
 			// Update stats
 			timeEnd := time.Now()
-			elapsed := int64(timeEnd.Sub(timeStart) / time.Millisecond)
+			elapsed = int64(timeEnd.Sub(timeStart) / time.Millisecond)
 
 			if err != nil {
 				b.TransactionChan <- stats.Transaction{
@@ -658,7 +658,7 @@ func (b *Bidder) PostKey(rowIdx int) error {
 
 			// Update stats
 			timeEnd := time.Now()
-			elapsed := int64(timeEnd.Sub(timeStart) / time.Millisecond)
+			elapsed = int64(timeEnd.Sub(timeStart) / time.Millisecond)
 
 			if err != nil {
 				b.TransactionChan <- stats.Transaction{
