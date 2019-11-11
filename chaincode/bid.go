@@ -13,9 +13,9 @@ import (
 // - Experiment 1:
 //		a. If write-key <slot_number>-<action> is not found, creates map[string][]byte
 //			as value for that write-key, and persists encrypted bid (encrypted JSON
-//			`BidInput` object) to map[bidder_id].
+//			`BidInput` object) to map[bid_event_id].
 //		b. If write-key <slot_number>-<action> is found, it persists encrypted bid
-//			(encrypted JSON `BidInput` object) to map[bidder_id] (the value for the
+//			(encrypted JSON `BidInput` object) to map[bid_event_id] (the value for the
 //			write-key will be a map).
 // - Experiments 2, 3:
 //		a. Creates write-key <slot_number>-<action>-<tx_id> for experiments 2, 3
