@@ -96,7 +96,7 @@ func (oc *opContext) Marshal(val interface{}) ([]byte, error) {
 	return valB, nil
 }
 
-// Unmarshal wraps the JSON decoded and logs any errors to the writer.
+// Unmarshal wraps the JSON decoder and logs any errors to the writer.
 func (oc *opContext) Unmarshal(valB []byte, val interface{}) error {
 	if err := json.Unmarshal(valB, &val); err != nil {
 		msg := fmt.Sprintf("tx_id:%s event_id:%s slot:%012d action:%s • cannot decode JSON: %s", oc.txID, oc.args.EventID, oc.args.Slot, oc.args.Action, err.Error())

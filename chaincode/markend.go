@@ -12,8 +12,8 @@ import (
 )
 
 // Marks the end of a slot.
-// - In case of experiment 3, deserializes the private key in `oc.args.Data`
-// - In case of experiments 1 or 2, retrieves the private keys for `oc.args.Slot`
+// - In case of experiment 2, deserializes the private key in `oc.args.Data`
+// - In case of experiments 1 or 3, retrieves the private keys for `oc.args.Slot`
 // 	 	posted in the chaincode's KV store
 // - Decodes the posted bids
 // - Creates a bid collection for buyers and sellers for slot`oc.args.Slot`

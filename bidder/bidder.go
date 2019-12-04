@@ -87,7 +87,8 @@ type Bidder struct {
 	PostKeyQueue chan int
 	// Maintains a mapping between the bid for a rowIdx (key) and the
 	// associated event ID and write-key in the chaincode's KVS. We write
-	// to this map during bids (buy/sells), and read from it when we post keys.
+	// to this map during bids (buy/sells), and read from it when we post
+	// keys, so that we can associate the posted key with the right bid.
 	RecentBidKeys      *cmap.Container
 	RecentBidKeysQueue chan RecentBidKeysKV
 
@@ -147,7 +148,7 @@ func New(invoker Invoker, slotBidNotifier Notifier, slotPostKeyNotifier Notifier
 
 	subTrace := trace[:5760]
 	if schema.StagingLevel <= schema.Debug {
-		subTrace = trace[:5] // We only care about the first 5 values.
+		subTrace = trace[:50] // We only care about the first 50 values.
 	}
 
 	return &Bidder{

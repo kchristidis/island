@@ -81,7 +81,7 @@ func metrics() error {
 		"late_cnt_all", "late_cnt_buy", "late_cnt_sell",
 		"late_decrs",
 		"prob_iters", "prob_marshals",
-		"prob_decrs", "prob_bids",
+		"prob_decrs", "prob_bid_calcs",
 		"prob_keys", "prob_gets", "prob_puts"}); err != nil {
 		return err
 	}

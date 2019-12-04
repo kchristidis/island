@@ -14,10 +14,10 @@ import (
 // - Experiment 1:
 //		a. If write-key <PostKeyInput.ReadKey>-<PostKeySuffix> is not found, creates
 //			map[string][]byte as value for that write-key, and writes JSON-encoded
-//			`schema.PostKeyOutput` to map[bidder_id].
+//			`schema.PostKeyOutput` to map[bid_event_id].
 //		2. If write-key <PostKeyInput.ReadKey>-<PostKeySuffix> is found, it writes
-//			JSON-encoded `schema.PostKeyOutput` to map[bidder_id] (the value for the
-//			write-key will be a map).
+//			JSON-encoded `schema.PostKeyOutput` to map[bid_event_id] (the value for
+//			the write-key will be a map).
 // - Experiments 2, 3:
 //		a. Creates write-key <PostKeyInput.ReadKey>-<PostKeySuffix>
 //		b. Writes JSON-encoded `schema.PostKeyOutput` to write-key

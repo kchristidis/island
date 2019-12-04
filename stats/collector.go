@@ -126,7 +126,10 @@ func (c *Collector) SlotCalc(newLine Slot, aggStats *[schema.TraceLength]Slot) {
 
 		curLine.EnergyTraded = newLine.EnergyTraded
 		curLine.PriceTraded = newLine.PriceTraded
+		// This variable should be renamed; `EnergyUse` actually tracks energy that is
+		// consumed by the grid. Therefore we deduct the quantity that was met internally.
 		curLine.EnergyUse -= newLine.EnergyTraded
+		// As above, `EnergyGen` tracks energy that is sold to the grid.
 		curLine.EnergyGen -= newLine.EnergyTraded
 
 		(*aggStats)[slotNum] = curLine
