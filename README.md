@@ -69,17 +69,17 @@ To enable debugging mode, set `schema.StagingLevel` to `Debug` before running th
 
 The simulated local energy market consists of `trace.IDCount` households. It runs for `schema.TraceLength` slots.
 
-Households are equipped with solar panels, and therefore may produce their own energy. They will sell that excess energy to a neighbor, if there is demand; otherwise they will sell it back to the grid for a lower price. Note that we do not consider a residential energy storage mechanism.
+Households are equipped with solar panels, and therefore may produce their own energy. They will sell that excess energy to a neighbor, if there is demand; otherwise they will sell it back to the grid for a lower price. We do not consider a residential energy storage mechanism.
 
 Energy is exchanged within the market using a closed-book double auction mechanism.
 
-Each household is represented in that auction by a `bidder` (a "smart" process).
+Each household is represented in that auction by a `bidder`.
 
-On every slot, bidders place a `buy` offer if their energy needs are larger than their energy generation; they place a `sell` offer if the opposite applies. All bids are encrypted. The bidders are rational; the prices they pick for their bids are greater than the low price that the grid is offering to them for their surplus, and smaller than the high price that the grid is selling energy to them for. For a given slot, every bidder picks the price for their bid randomly within that price interval for a given slot.
+On every slot, bidders place a `buy` offer if their energy needs are larger than their energy generation for that slot; they place a `sell` offer if the opposite applies. All bids are encrypted. The bidders are rational; the prices they pick for their bids are greater than the low price that the grid is offering to them for their surplus, and smaller than the high price that the grid is selling energy to them for. For a given slot, every bidder picks the price for their bid randomly within that price interval for a given slot.
 
 At the end of the slot, a market clearing price is calculated (using the [dauction](https://github.com/kchristidis/dauction) library).
 
-The simulation engine tracks the performance of the market; how much energy was bought by the grid and at which price, how much energy was sold to the grid and at which price, how much energy was traded within the market and at which market clearing price. It also tracks the performance of the underlying transaction management platform for a given experiment type; count of late transactions, problematic decryptions, size of blocks, etc. All of this informatios is persisted in files that are produced at the end of each run.
+The simulation engine tracks the performance of the market; how much energy was bought by the grid and at which price, how much energy was sold to the grid and at which price, how much energy was traded within the market and at which market clearing price. It also tracks the performance of the underlying transaction management platform for a given experiment type; count of late transactions, problematic decryptions, size of blocks, etc. All of this information is persisted in files that are produced at the end of each run.
 
 ### Trace
 
@@ -95,7 +95,7 @@ The expectation is that every slot should capture:
 
 All power values should correspond to average real power over the slot in kW.
 
-All prices should be cents per kWh.
+All prices should be denominated cents per kWh.
 
 See [kchristidis/island-input](https://github.com/kchristidis/island-input) repo for a sample trace.
 
@@ -103,7 +103,7 @@ See [kchristidis/island-input](https://github.com/kchristidis/island-input) repo
 
 A `bidder` represents a household in the local energy market. They place a `buy` bid for slot `N` if their projected energy usage (the `trace.Use` value) for that slot is positive. They place a `sell` bid if their projected energy production (`trace.Gen`) is positive. On a given slot, each bidder can a place of maximum of one `buy` _and_ one `sell` bid.
 
-In Experiments 1 and 3, bidders encrypt their bids with their own unique private key per slot; as such, they are expect to post their decryption key (`postKey`) when the `PostKey` phase in that slot begins.
+In Experiments 1 and 3, bidders encrypt their bids with their own unique private key per slot; as such, they are expected to post their decryption key (`postKey`) when the `PostKey` phase in that slot begins.
 
 In Experiment 2, we introduce the concept of a `regulator`. For a given slot, all bids are encrypted using the regulator's public key. At the end of the slot, the regulator posts their private key to allow the decryption of the posted bids for that slot, and the calculation of the market clearing price. See the "Types of experiments" section for more info.
 
@@ -119,21 +119,21 @@ The `statscollector` thread receives block statistics from the `blocknotifier` (
 
 The contract encodes the primitives necessary to run the double auction. It exposes the following methods:
 
-1. `buy` and `sell`: In Experiment 1, it persists the encrypted bid in a key in the contract's key-value store that is common for all bids of that type (i.e. `buy` or `sell`) in that slot. In Experiments 2 and 3, it persists the encrypted bid in a key that is unique per bid in that slot.
-2. `postKey`: In Experiment 1, it persists the private key for a given bid in a key that is common for all private keys in that slot. In Experiment 3, it persists the private key for a given bid in a key that is unique per private key in that slot. In Experiment 2, this method is not invoked; the private key will be posted by the regulator on the `markEnd` call.
+1. `buy` and `sell`: In Experiment 1, it persists the encrypted bid in a key (data slice) in the contract's key-value store that is common for all bids of that type (i.e. `buy` or `sell`) in that slot. In Experiments 2 and 3, it persists the encrypted bid in a key that is unique per bid in that slot.
+2. `postKey`: In Experiment 1, it persists the private key for a given bid in a key that is common for all private keys in that slot. In Experiment 3, it persists the private key for a given bid in a data slice that is unique per private key in that slot. In Experiment 2, this method is not invoked; the private key will be posted by the regulator on the `markEnd` call.
 3. `markEnd`: It is invoked by at the beginning of slot `N` to mark the end of slot `N-1`. In Experiment 2, the regulator uses that call to post the private key that decrypts all bids posted in slot `N-1`, so that every market participant can calculate the market clearing price locally.
 
 For exposition across all experiments, we use this `markEnd` method to calculate the market clearing price (decode all the posted bids for slot `N-1`, create bid collections for buyers and sellers, calculate the market clearing price, post that value in the chaincode's key-value store); this is **not** necessary; across all experiments, the market participants are in a position to calculate the market clearing price for a slot locally, after the end of that slot.
 
 If a chaincode invocation fails, it will be retried `schema.RetryCount` times, for a total of up to `schema.RetryCount + 1` times.
 
-For Experiment 1, the wait time between retries follows an exponential backoff formula; we wait anywhere from `[0, schema.Alpha * 2 ^ (currentAttemptNumber))` blocks.
+The wait time between retries follows an exponential backoff algorithm for better flow control; concretely, we wait anywhere from `[0, schema.Alpha * 2 ^ (currentAttemptNumber))` blocks.
 
 ### Time slotting
 
-Each experiments runs for `schema.TraceLength` slots.
+Each experiment runs for `schema.TraceLength` slots.
 
-A slot consists of `schema.BlocksPerSlot` blocks. For those experiments with a `PostKey` phase, this phase begins `schema.BlockOffset` blocks into the slot.
+A slot consists of `schema.BlocksPerSlot` blocks. For those experiments with a `PostKey` phase (i.e. experiments 1 and 3), this phase begins `schema.BlockOffset` blocks into the slot.
 
 A block is cut every `schema.BatchTimeout` seconds, or every `Orderer.BatchSize.MaxMessageCount` messages; whichever comes first.
 
@@ -141,7 +141,9 @@ The block notifier process checks the ledger for blocks every `schema.SleepDurat
 
 ### Types of experiments
 
-We designt these along two axes: encryption keys for the posted bids, and data model for the smart contract.
+We design these along two axes: encryption keys for the posted bids, and data model (data slices) for the smart contract.
+
+![](assets/experiment-quadrants.png)
 
 In Experiments 1 and 3, bidders encrypt their bids using their own keys. In Experiment 2, they encrypt using the public key of the regulator for that slot.
 
@@ -203,26 +205,26 @@ Values for each row in the `*-block.csv` file (type of value [in brackets]):
 10. `late_cnt_sell` [integer]: count of late `sell` transactions
 11. `late_decrs` [integer]: count of late `postKey` transactions
 12. `prob_iters` [integer]: count of problematic iterations; this may occur when we attempt to iterate over the keys in the contract's key-value store with a partial composite key
-13. `prob_marshals` [integer]: count of problematic serializations and deserializations. This counter is bumped if an error occurs when the contract attempts to serialize the JSON blob that it will send back to the invoker as a response, or when the contract attempts to deserialize the call arguments, or a marshalled value in the contract's key-value store.
+13. `prob_marshals` [integer]: count of problematic serializations and deserializations. This counter is incremented if an error occurs when (a) the contract attempts to serialize the JSON blob that it will send back to the invoker as a response, or (b) when the contract attempts to deserialize the call arguments, or a marshalled value in the contract's key-value store.
 14. `prob_decrs` [integer]: count of problematic decryption attempts; these can happen during the `markEnd` call when we attempt to retrieve a serialized PEM-encoded private key, deserialize said key, decode said key, or decode the bid that is encrypted with said key.
 15. `prob_bid_calcs` [integer]: count of problematic attempts to calculate the market clearing price during the `markEnd` call
 16. `prob_keys` [integer]: count of problematic attempts to interact with a key in the contract's key-value store, i.e. read from it or write to it; it is the sum of `prob_gets` and `prob_puts`
 17. `prob_gets` [integer]: count of problematic attempts to read a key from the contract's key-value store
 18. `prob_puts` [integer]: count of problematic attempts to write a key to the contract's key-value store
 
-For practitioners that wish to understand the exact context in which a slot counter is bumped, see the fields in the `MetricsOutput` struct in `chaincode/schema.go` and grep the codebase for them.
+For practitioners that wish to understand the exact context under which a slot counter is incremented, see the fields in the `MetricsOutput` struct in `chaincode/schema.go` and grep the codebase for them.
 
 #### Transaction-indexed stats
 
 1. `tx_id` [string] (*index*): the transaction under inspection
-2. `latency_ms` [integer]: the end-to-end latency of the transaction, as observed by the client; timer starts right before the client invokes the smart contract method, timer ends when the contract response is received.
-3. `tx_type` [string]: the type of the transaction; allowed values are `buy`, `sell`, `postKey`, and `markEnd`,
+2. `latency_ms` [integer]: the end-to-end latency of the transaction, as observed by the client; timer starts right before the client invokes the smart contract method; timer ends when the contract response is received.
+3. `tx_type` [string]: the type of the transaction; allowed values are `buy`, `sell`, `postKey`, and `markEnd`.
 4. `attempt` [intger]: the attempt for this particular transaction; a transaction can be attempted up to `schema.RetryCount` times.
 5. `tx_status` [string]: the result of the transaction; allowed values are `success`, or the specific error that the invocation returned.
 
 ## Credits
 
-This repo began its life as a fork of the [heroes-service repo](https://github.com/chainHero/heroes-service). Experiments 2-3 make use of the composite keys iteration as demonstrated in the [high-throughput Fabric sample](https://github.com/hyperledger/fabric-samples/blob/ab46e3548c46acf1c541eca71914c20bbe212f6a/high-throughput/README.md).
+This repo began its life as a fork of the [heroes-service repo](https://github.com/chainHero/heroes-service). Experiments 2-3 make use of the composite keys iteration, initially demonstrated in the [high-throughput Fabric sample](https://github.com/hyperledger/fabric-samples/blob/ab46e3548c46acf1c541eca71914c20bbe212f6a/high-throughput/README.md).
 
 ## Contributing
 
