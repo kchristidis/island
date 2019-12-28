@@ -101,7 +101,11 @@ See [kchristidis/island-input](https://github.com/kchristidis/island-input) repo
 
 ### Agents
 
-A `bidder` represents a household in the local energy market. They place a `buy` bid for slot `N` if their projected energy usage (the `trace.Use` value) for that slot is positive. They place a `sell` bid if their projected energy production (`trace.Gen`) is positive. On a given slot, each bidder can a place of maximum of one `buy` _and_ one `sell` bid.
+A `bidder` represents a household in the local energy market. They place a `buy` bid for slot `N` if their projected energy usage (the `trace.Use` value) for that slot is positive. They place a `sell` bid if their projected energy production (`trace.Gen`) is positive.
+
+N.B. that this means that the prosumer tries to sell *all* of their output; instead of using it to satisfy their own needs first. This assumption does not necessarily work in favor of the individual generator (as they may end up bying energy for a higher price than they one they sell their own production for), but it contributes positively to the welfare of the local market. In practice, we do this here because we want to increase the opportunities for matching bids, as we wish to evaluate the trade clearing performance of the platform.
+
+On a given slot, each bidder can a place of maximum of one `buy` _and_ one `sell` bid.
 
 In Experiments 1 and 3, bidders encrypt their bids with their own unique private key per slot; as such, they are expected to post their decryption key (`postKey`) when the `PostKey` phase in that slot begins.
 
