@@ -2,7 +2,7 @@ package schema
 
 import "time"
 
-// Experiments parameters
+// Experiment parameters
 const (
 	ExpNum = 1 // Identifies the experiment this chaincode is running.
 
@@ -19,7 +19,9 @@ const (
 	TraceLength   = 35036     // Used to size the metrics variable.
 	EnableEvents  = false     // Used to enable/disable the emission of chaincode events.
 
-	StagingLevel = Debug // Identifies the staging level for the experiment.
+	StagingLevel        = Debug // Identifies the staging level for the experiment.
+	DebugTraceLength    = 35    // If in debugging mode, process only the first DebugTraceLength slots.
+	DebugBidderIDsCount = 5     // If in debugging mode, work only with the first DebugBidderIDsCount bidders in our set.
 )
 
 // Level identifies a staging level.

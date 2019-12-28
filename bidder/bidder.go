@@ -148,7 +148,7 @@ func New(invoker Invoker, slotBidNotifier Notifier, slotPostKeyNotifier Notifier
 
 	subTrace := trace[:5760]
 	if schema.StagingLevel <= schema.Debug {
-		subTrace = trace[:50] // We only care about the first 50 values.
+		subTrace = trace[:schema.DebugTraceLength] // We only care about the first `schema.DebugTraceLength` values.
 	}
 
 	return &Bidder{

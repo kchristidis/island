@@ -126,7 +126,7 @@ func run() error {
 
 	biddersList := trace.IDs
 	if schema.StagingLevel <= schema.Debug {
-		biddersList = biddersList[:10] // We only care about 10 participants.
+		biddersList = biddersList[:schema.DebugBidderIDsCount] // We only care about the first `schema.DebugBidderIDsCount` bidders.
 	}
 
 	for i, ID := range biddersList {
