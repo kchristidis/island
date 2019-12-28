@@ -305,6 +305,8 @@ func (b *Bidder) Run() error {
 
 			// Return when you're done processing your trace
 			if rowIdx == len(b.Trace)-1 {
+				msg := fmt.Sprintf("bidder:%04d slot:%012d • done processing the trace! exiting", b.ID, rowIdx)
+				fmt.Fprintln(b.Writer, msg)
 				return nil
 			}
 		case postKeySlot := <-b.SlotQueues[1]:
