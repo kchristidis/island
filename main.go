@@ -56,7 +56,7 @@ func run() error {
 	// Begin initializations
 
 	println()
-	msg := fmt.Sprintf("Simulating experiment %d...", schema.ExpNum)
+	msg := fmt.Sprintf("Simulating experiment %d (mode: %v)...", schema.ExpNum, schema.StagingLevel)
 	fmt.Fprintln(writer, msg)
 	println()
 
