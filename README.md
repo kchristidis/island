@@ -143,11 +143,11 @@ The block notifier process checks the ledger for blocks every `schema.SleepDurat
 
 We design these along two axes: encryption keys for the posted bids, and data model (data slices) for the smart contract.
 
-![](assets/experiment-quadrants.png)
+![The quadrants defined by the axes we focus on for this simulation: bid encryption, and data slicing.](assets/experiment-quadrants.png)
 
 In Experiments 1 and 3, bidders encrypt their bids using their own keys. In Experiment 2, they encrypt using the public key of the regulator for that slot.
 
-In Experiment 1, bidders post all of their buy offers for a given slot in the _same_ key in the contract's key-value store. Ditto for sell offers, or `postKey` transactions. As a result, we expect contention and MVCC read conflicts; this experiment is meant to demonstrate what can happen if the contract is not set up correctly. In Experiments 2 and 3, every transaction updates a key in the contract's key-value store that is _unique_ to that transaction.
+In Experiment 1, bidders post all of their buy offers for a given slot in the _same_ key in the contract's key-value store. Ditto for sell offers, or `postKey` transactions. As a result, we expect contention and MVCC read conflicts. In order to mitigate this contention somewhat, bidders always backoff exponentially even before their first attempt to post. This experiment is meant to demonstrate what can happen if the contract is not set up correctly, i.e. we expect it to be the most sub-optimal approach of the lot. In Experiments 2 and 3, every transaction updates a key in the contract's key-value store that is _unique_ to that transaction.
 
 To change the experiment that the simulation executes, modify `schema.ExpNum`.
 
