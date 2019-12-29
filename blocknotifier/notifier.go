@@ -3,6 +3,7 @@ package blocknotifier
 import (
 	"fmt"
 	"io"
+	"math"
 	"math/rand"
 	"strconv"
 	"sync"
@@ -15,6 +16,9 @@ import (
 	"github.com/kchristidis/island/chaincode/schema"
 	"github.com/kchristidis/island/stats"
 )
+
+// BufferLen sets the buffer length for the block channel.
+const BufferLen = 100
 
 //go:generate counterfeiter . Invoker
 
@@ -41,13 +45,15 @@ type Notifier struct {
 	SleepDuration  time.Duration // How often do we check for new blocks?
 	StartFromBlock uint64        // Which block will be the very first block of the first slot?
 
-	BlockChan chan stats.Block // Used to feed the stats collector
+	BlockChan  chan stats.Block   // Used to feed the stats collector
+	BlockQueue chan *common.Block // Used to decouple the feeding of the stats collector from the main thread
 
 	SlotChan chan int // Post slot notifications here
 
-	BlockHeightOfMostRecentSlot uint64 // Used by the slot notifier
-	MostRecentSlot              int
-	MostRecentBlockHeight       uint64 // Used by the block stats collector
+	ErrorThreshold int // How many failed query attempts can we tolerate before quitting?
+
+	LargestBlockHeightObserved uint64 // Used by the block stats collector
+	LargestSlotTriggered       int
 
 	Invoker Invoker
 	Querier Querier
@@ -70,9 +76,14 @@ func New(blocksperslot int, clockperiod time.Duration, sleepduration time.Durati
 		SleepDuration:  sleepduration,
 		StartFromBlock: startfromblock,
 
-		BlockChan: blockc,
+		BlockChan:  blockc,
+		BlockQueue: make(chan *common.Block, BufferLen),
 
 		SlotChan: slotc,
+
+		ErrorThreshold: 10,
+
+		LargestSlotTriggered: -1,
 
 		Invoker: invoker,
 		Querier: querier,
@@ -120,98 +131,92 @@ func (n *Notifier) Run() error {
 		}
 	}()
 
+	n.waitGroup.Add(1)
+	go func() {
+		defer n.waitGroup.Done()
+		for {
+			select {
+			case <-n.killChan:
+				return
+			case block := <-n.BlockQueue:
+				n.RecordStats(block)
+			case <-n.DoneChan:
+				return
+			}
+		}
+	}()
+
 	for {
 		select {
 		case <-n.DoneChan:
 			return nil
 		default:
-			resp, err := n.Querier.QueryInfo()
-			if err != nil {
-				msg = fmt.Sprintf("block-notifier:%02d • cannot query ledger: %s", n.StartFromBlock, err.Error())
-				fmt.Fprintln(n.Writer, msg)
-				return err
-			}
+			var block *common.Block
+			var err error
 
-			inHeight := resp.BCI.GetHeight() - 1 // ATTN: Do not forget to decrement by 1
-			if inHeight > n.MostRecentBlockHeight {
-				n.MostRecentBlockHeight = inHeight
-
-				if schema.StagingLevel <= schema.Debug {
-					msg = fmt.Sprintf("block-notifier:%02d block:%012d • block committed at the peer", n.StartFromBlock, int(n.MostRecentBlockHeight))
+			for i := 1; i <= n.ErrorThreshold; i++ {
+				block, err = n.Querier.QueryBlock(math.MaxUint64)
+				if err != nil {
+					msg = fmt.Sprintf("block-notifier:%02d • cannot query ledger (errcnt:%d): %s", n.StartFromBlock, i, err.Error())
 					fmt.Fprintln(n.Writer, msg)
-				}
-
-				/*
-					As a temporary solution to this problem "cannot get block 59797's size:
-					QueryBlock failed: Transaction processing for endorser [localhost:7051]:
-					Chaincode status Code: (500) UNKNOWN. Description: Failed to get block
-					number 59797, error Error getting envelope(unexpected EOF)", we query a
-					lagging height.
-				*/
-
-				if inHeight >= n.StartFromBlock {
-					laggingHeight := inHeight - n.StartFromBlock
-					block, err := n.Querier.QueryBlock(laggingHeight)
-					if err != nil {
-						msg = fmt.Sprintf("block-notifier:%02d • cannot get block %d's size: %s", n.StartFromBlock, laggingHeight, err.Error())
-						fmt.Fprintln(n.Writer, msg)
+					if i >= n.ErrorThreshold {
 						return err
 					}
-					blockB, err := proto.Marshal(block)
-					if err != nil {
-						msg = fmt.Sprintf("block-notifier:%02d • cannot marshal block %d: %s", n.StartFromBlock, laggingHeight, err.Error())
-						fmt.Fprintln(n.Writer, msg)
-						return err
-					}
+					// time.Sleep(n.SleepDuration)
+				} else {
+					break
+				}
+			}
 
-					blockStat := stats.Block{
-						Number: laggingHeight,
-						Size:   float32(len(blockB)) / 1024, // Size in KiB
-					}
-					select {
-					case n.BlockChan <- blockStat:
-					default:
-					}
-
-					if schema.StagingLevel <= schema.Debug {
-						msg = fmt.Sprintf("block-notifier:%02d block:%012d • pushed block to the stats collector (len: %d)", n.StartFromBlock, laggingHeight, len(n.BlockChan))
+			// If we're here, we've successfully queried a block.
+			if inHeight := block.GetHeader().GetNumber(); inHeight > 0 {
+				if inHeight > n.LargestBlockHeightObserved {
+					n.LargestBlockHeightObserved = inHeight
+					n.BlockQueue <- block                                    // Feed that block to the stats collector
+					if int(inHeight-n.StartFromBlock)%n.BlocksPerSlot == 0 { // Is is this block marking a new slot?
+						n.LargestSlotTriggered = int(inHeight-n.StartFromBlock) / n.BlocksPerSlot
+						msg = fmt.Sprintf("block-notifier:%02d block:%012d • new slot! block corresponds to slot %012d", n.StartFromBlock, inHeight, n.LargestSlotTriggered)
 						fmt.Fprintln(n.Writer, msg)
+						n.SlotChan <- n.LargestSlotTriggered
 					}
 				}
 			}
 
-			// Slot notifier
-			switch n.BlockHeightOfMostRecentSlot {
-			case 0: // If this is the case, then we haven't reached StartFromBlock yet
-				if inHeight < n.StartFromBlock {
-					continue
-				}
-
-				if inHeight != n.StartFromBlock {
-					msg = fmt.Sprintf("block-notifier:%02d block:%012d • expected block %012d as start block", n.StartFromBlock, inHeight, n.StartFromBlock)
-					fmt.Println(n.Writer, msg)
-					return fmt.Errorf(msg)
-				}
-
-				n.MostRecentSlot = int(inHeight - n.StartFromBlock) // This should be 0
-				n.BlockHeightOfMostRecentSlot = inHeight
-				msg = fmt.Sprintf("block-notifier:%02d block:%012d • new slot! block corresponds to slot %012d", n.StartFromBlock, inHeight, n.MostRecentSlot)
-				fmt.Fprintln(n.Writer, msg)
-				n.SlotChan <- n.MostRecentSlot
-			default: // We're hitting this case only after we've reached StartFromBlock
-				if inHeight <= n.BlockHeightOfMostRecentSlot {
-					continue
-				}
-
-				if int(inHeight-n.StartFromBlock)%n.BlocksPerSlot == 0 {
-					n.MostRecentSlot = int(inHeight-n.StartFromBlock) / n.BlocksPerSlot
-					n.BlockHeightOfMostRecentSlot = inHeight
-					msg := fmt.Sprintf("block-notifier:%02d block:%012d • new slot! block corresponds to slot %012d", n.StartFromBlock, inHeight, n.MostRecentSlot)
-					fmt.Fprintln(n.Writer, msg)
-					n.SlotChan <- n.MostRecentSlot
-				}
-			}
 			time.Sleep(n.SleepDuration)
 		}
 	}
+}
+
+// RecordStats on newly observed blocks.
+func (n *Notifier) RecordStats(block *common.Block) error {
+	height := block.GetHeader().GetNumber()
+	var msg string
+
+	/* if schema.StagingLevel <= schema.Debug {
+		msg = fmt.Sprintf("block-notifier:%02d block:%012d • block committed at the peer", n.StartFromBlock, height)
+		fmt.Fprintln(n.Writer, msg)
+	} */
+
+	blockB, err := proto.Marshal(block)
+	if err != nil {
+		msg = fmt.Sprintf("block-notifier:%02d • cannot marshal block %d: %s", n.StartFromBlock, height, err.Error())
+		fmt.Fprintln(n.Writer, msg)
+		return err
+	}
+
+	blockStat := stats.Block{
+		Number: height,
+		Size:   float32(len(blockB)) / 1024, // Size in KiB
+	}
+
+	select {
+	case n.BlockChan <- blockStat:
+		if schema.StagingLevel <= schema.Debug {
+			msg = fmt.Sprintf("block-notifier:%02d block:%012d • pushed block to the stats collector (chlen:%d)", n.StartFromBlock, height, len(n.BlockChan))
+			fmt.Fprintln(n.Writer, msg)
+		}
+	default:
+	}
+
+	return nil
 }
