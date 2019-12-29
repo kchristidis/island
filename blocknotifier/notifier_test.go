@@ -117,7 +117,7 @@ func TestNotifier(t *testing.T) {
 			close(deadc)
 		}()
 
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("cannot query ledger"))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("error"))
 
 		close(donec)
 		<-deadc

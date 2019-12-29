@@ -3,7 +3,6 @@ package blocknotifier
 import (
 	"fmt"
 	"io"
-	"math"
 	"math/rand"
 	"strconv"
 	"sync"
@@ -52,7 +51,7 @@ type Notifier struct {
 
 	ErrorThreshold int // How many failed query attempts can we tolerate before quitting?
 
-	LargestBlockHeightObserved uint64 // Used by the block stats collector
+	LargestBlockHeightObserved uint64
 	LargestSlotTriggered       int
 
 	Invoker Invoker
@@ -155,14 +154,14 @@ func (n *Notifier) Run() error {
 			var err error
 
 			for i := 1; i <= n.ErrorThreshold; i++ {
-				block, err = n.Querier.QueryBlock(math.MaxUint64)
+				block, err = n.Querier.QueryBlock(n.LargestBlockHeightObserved + 1)
 				if err != nil {
-					msg = fmt.Sprintf("block-notifier:%02d • cannot query ledger (errcnt:%d): %s", n.StartFromBlock, i, err.Error())
+					msg = fmt.Sprintf("block-notifier:%02d block:%012d • error querying ledger (errcnt:%d): %s", n.StartFromBlock, n.LargestBlockHeightObserved+1, i, err.Error())
 					fmt.Fprintln(n.Writer, msg)
 					if i >= n.ErrorThreshold {
 						return err
 					}
-					// time.Sleep(n.SleepDuration)
+					time.Sleep(2 * n.SleepDuration)
 				} else {
 					break
 				}
@@ -192,10 +191,10 @@ func (n *Notifier) RecordStats(block *common.Block) error {
 	height := block.GetHeader().GetNumber()
 	var msg string
 
-	/* if schema.StagingLevel <= schema.Debug {
+	if schema.StagingLevel <= schema.Debug {
 		msg = fmt.Sprintf("block-notifier:%02d block:%012d • block committed at the peer", n.StartFromBlock, height)
 		fmt.Fprintln(n.Writer, msg)
-	} */
+	}
 
 	blockB, err := proto.Marshal(block)
 	if err != nil {
