@@ -1,7 +1,6 @@
 package bidder_test
 
 import (
-	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -36,12 +35,13 @@ func TestBidder(t *testing.T) {
 
 		slotnotifier0 := new(bidderfakes.FakeNotifier)
 		slotnotifier0.RegisterReturns(false)
-		slotnotifiers := []bidder.Notifier{slotnotifier0}
+		slotnotifier1 := new(bidderfakes.FakeNotifier)
+		slotnotifier1.RegisterReturns(false)
 
 		bfr := gbytes.NewBuffer()
 		donec := make(chan struct{})
 
-		b := bidder.New(invoker, slotnotifiers[0], nil, trace.IDs[0], privkeybytes, m[trace.IDs[0]], slotc, transactionc, bfr, donec)
+		b := bidder.New(invoker, slotnotifier0, slotnotifier1, trace.IDs[0], privkeybytes, m[trace.IDs[0]], slotc, transactionc, bfr, donec)
 
 		var err error
 		deadc := make(chan struct{})
@@ -63,12 +63,13 @@ func TestBidder(t *testing.T) {
 
 		slotnotifier0 := new(bidderfakes.FakeNotifier)
 		slotnotifier0.RegisterReturns(true)
-		slotnotifiers := []bidder.Notifier{slotnotifier0}
+		slotnotifier1 := new(bidderfakes.FakeNotifier)
+		slotnotifier1.RegisterReturns(true)
 
 		bfr := gbytes.NewBuffer()
 		donec := make(chan struct{})
 
-		b := bidder.New(invoker, slotnotifiers[0], nil, trace.IDs[0], privkeybytes, m[trace.IDs[0]], slotc, transactionc, bfr, donec)
+		b := bidder.New(invoker, slotnotifier0, slotnotifier1, trace.IDs[0], privkeybytes, m[trace.IDs[0]], slotc, transactionc, bfr, donec)
 
 		var err error
 		deadc := make(chan struct{})
@@ -89,14 +90,15 @@ func TestBidder(t *testing.T) {
 
 		slotnotifier0 := new(bidderfakes.FakeNotifier)
 		slotnotifier0.RegisterReturns(true)
-		slotnotifiers := []bidder.Notifier{slotnotifier0}
+		slotnotifier1 := new(bidderfakes.FakeNotifier)
+		slotnotifier1.RegisterReturns(true)
 
 		slot := 1
 
 		bfr := gbytes.NewBuffer()
 		donec := make(chan struct{})
 
-		b := bidder.New(invoker, slotnotifiers[0], nil, trace.IDs[0], privkeybytes, m[trace.IDs[0]], slotc, transactionc, bfr, donec)
+		b := bidder.New(invoker, slotnotifier0, slotnotifier1, trace.IDs[0], privkeybytes, m[trace.IDs[0]], slotc, transactionc, bfr, donec)
 
 		// var err error
 		deadc := make(chan struct{})
@@ -108,8 +110,7 @@ func TestBidder(t *testing.T) {
 		invoker.InvokeReturns(nil, nil)
 		b.SlotQueues[0] <- slot
 
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say(fmt.Sprintf("slot %d has arrived", slot)))
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("about to invoke 'buy'"))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("new slot"))
 
 		close(donec)
 		<-deadc
