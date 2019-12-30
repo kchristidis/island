@@ -52,8 +52,8 @@ func TestRegulator(t *testing.T) {
 			close(deadc)
 		}()
 
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Unable to register with slot notifier"))
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Exited"))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("cannot register"))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("exited"))
 
 		close(donec)
 		<-deadc
@@ -86,7 +86,7 @@ func TestRegulator(t *testing.T) {
 		close(donec)
 		<-deadc
 
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("Exited"))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("exited"))
 		g.Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -121,8 +121,7 @@ func TestRegulator(t *testing.T) {
 
 		r.SlotQueue <- slot
 
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say(fmt.Sprintf("Got notified that slot %d has arrived", slot)))
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say(fmt.Sprintf("Invoking 'markEnd' @ slot %d", slot)))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say(fmt.Sprintf("slot:%012d • about to invoke 'markEnd'", slot)))
 
 		g.Eventually(func() int {
 			args := invoker.InvokeArgsForCall(0)
@@ -162,11 +161,11 @@ func TestRegulator(t *testing.T) {
 
 		r.SlotQueue <- slot
 
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say(fmt.Sprintf("Unable to invoke @ slot %d", slot)))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say(fmt.Sprintf("slot:%012d • failure! cannot invoke 'markEnd'", slot)))
 
 		close(donec)
 		<-deadc
-		g.Expect(err).To(HaveOccurred())
+		g.Expect(err).NotTo(HaveOccurred())
 	})
 
 	t.Run("invocation fails", func(t *testing.T) {
@@ -197,7 +196,7 @@ func TestRegulator(t *testing.T) {
 
 		r.SlotQueue <- slot
 
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say(fmt.Sprintf("Unable to push notification of slot %d to task queue", slot)))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say(fmt.Sprintf("slot:%012d • cannot push notification to task queue", slot)))
 
 		close(donec)
 		<-deadc

@@ -1,6 +1,7 @@
 package bidder_test
 
 import (
+	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -110,7 +111,7 @@ func TestBidder(t *testing.T) {
 		invoker.InvokeReturns(nil, nil)
 		b.SlotQueues[0] <- slot
 
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("new slot"))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say(fmt.Sprintf("slot:%012d • new slot", slot)))
 
 		close(donec)
 		<-deadc
