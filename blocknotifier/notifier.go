@@ -154,6 +154,7 @@ func (n *Notifier) Run() error {
 			var err error
 
 			for i := 1; i <= n.ErrorThreshold; i++ {
+				time.Sleep(n.SleepDuration)
 				block, err = n.Querier.QueryBlock(n.LargestBlockHeightObserved + 1)
 				if err != nil {
 					msg = fmt.Sprintf("block-notifier:%02d block:%012d • error querying ledger (errcnt:%d): %s", n.StartFromBlock, n.LargestBlockHeightObserved+1, i, err.Error())
@@ -161,7 +162,7 @@ func (n *Notifier) Run() error {
 					if i >= n.ErrorThreshold {
 						return err
 					}
-					time.Sleep(2 * n.SleepDuration)
+					time.Sleep(n.SleepDuration)
 				} else {
 					break
 				}
