@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 	"github.com/hyperledger/fabric-sdk-go/third_party/github.com/hyperledger/fabric/protos/common"
 	"github.com/kchristidis/island/blocknotifier"
 	"github.com/kchristidis/island/blocknotifier/blocknotifierfakes"
@@ -26,6 +27,9 @@ func TestNotifier(t *testing.T) {
 	querier.QueryBlockReturns(new(common.Block), nil)
 	bfr := gbytes.NewBuffer()
 
+	resp := new(fab.BlockchainInfoResponse)
+	resp.BCI = new(common.BlockchainInfo)
+
 	blocksperslot := 3
 	clockperiod := 500 * time.Millisecond
 	sleepduration := 10 * time.Millisecond
@@ -36,12 +40,8 @@ func TestNotifier(t *testing.T) {
 
 		n := blocknotifier.New(blocksperslot, clockperiod, sleepduration, startfromblock, blockc, slotc, invoker, querier, bfr, donec)
 
-		block := common.Block{
-			Header: &common.BlockHeader{
-				Number: n.StartFromBlock - 1,
-			},
-		}
-		querier.QueryBlockReturns(&block, nil)
+		resp.BCI.Height = n.StartFromBlock // ATTN: This corresponds to BlocnkNumber = n.StartFromBlock - 1
+		querier.QueryInfoReturns(resp, nil)
 
 		var err error
 		deadc := make(chan struct{})
@@ -71,12 +71,8 @@ func TestNotifier(t *testing.T) {
 
 		n := blocknotifier.New(blocksperslot, clockperiod, sleepduration, startfromblock, blockc, slotc, invoker, querier, bfr, donec)
 
-		block := common.Block{
-			Header: &common.BlockHeader{
-				Number: n.StartFromBlock,
-			},
-		}
-		querier.QueryBlockReturns(&block, nil)
+		resp.BCI.Height = n.StartFromBlock + 1
+		querier.QueryInfoReturns(resp, nil)
 
 		var err error
 		deadc := make(chan struct{})
@@ -84,8 +80,6 @@ func TestNotifier(t *testing.T) {
 			err = n.Run()
 			close(deadc)
 		}()
-
-		// I expect to receive the slot notification
 
 		g.Eventually(func() int {
 			select {
@@ -108,7 +102,7 @@ func TestNotifier(t *testing.T) {
 
 		n := blocknotifier.New(blocksperslot, clockperiod, sleepduration, startfromblock, blockc, slotc, invoker, querier, bfr, donec)
 
-		querier.QueryBlockReturns(nil, errors.New("foo"))
+		querier.QueryInfoReturns(nil, errors.New("foo"))
 
 		var err error
 		deadc := make(chan struct{})
@@ -117,7 +111,7 @@ func TestNotifier(t *testing.T) {
 			close(deadc)
 		}()
 
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("error"))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say("cannot query"))
 
 		close(donec)
 		<-deadc
@@ -129,12 +123,8 @@ func TestNotifier(t *testing.T) {
 
 		n := blocknotifier.New(blocksperslot, clockperiod, sleepduration, startfromblock, blockc, slotc, invoker, querier, bfr, donec)
 
-		block := common.Block{
-			Header: &common.BlockHeader{
-				Number: n.StartFromBlock + 1,
-			},
-		}
-		querier.QueryBlockReturns(&block, nil)
+		resp.BCI.Height = n.StartFromBlock + 2*uint64(blocksperslot)
+		querier.QueryInfoReturns(resp, nil)
 
 		var err error
 		deadc := make(chan struct{})
@@ -143,14 +133,14 @@ func TestNotifier(t *testing.T) {
 			close(deadc)
 		}()
 
-		g.Consistently(func() int {
+		g.Eventually(func() int {
 			select {
 			case val := <-n.SlotChan:
 				return val
 			default:
 				return -1
 			}
-		}, "1s", "50ms").Should(Equal(-1))
+		}, "1s", "50ms").Should(Equal(1))
 
 		close(donec)
 		<-deadc
@@ -164,12 +154,8 @@ func TestNotifier(t *testing.T) {
 
 		n := blocknotifier.New(blocksperslot, clockperiod, sleepduration, startfromblock, blockc, slotc, invoker, querier, bfr, donec)
 
-		block := common.Block{
-			Header: &common.BlockHeader{
-				Number: n.StartFromBlock + uint64(blocksperslot),
-			},
-		}
-		querier.QueryBlockReturns(&block, nil)
+		resp.BCI.Height = n.StartFromBlock + uint64(blocksperslot) + 1
+		querier.QueryInfoReturns(resp, nil)
 
 		var err error
 		deadc := make(chan struct{})

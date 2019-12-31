@@ -44,15 +44,17 @@ type Notifier struct {
 	SleepDuration  time.Duration // How often do we check for new blocks?
 	StartFromBlock uint64        // Which block will be the very first block of the first slot?
 
-	BlockChan  chan stats.Block   // Used to feed the stats collector
-	BlockQueue chan *common.Block // Used to decouple the feeding of the stats collector from the main thread
+	BlockNumberChan chan int64       // Used to decouple the GetBlock goroutine from the main thread
+	BlockChan       chan stats.Block // Used by the GetBlock goroutine to feed the stats collector
 
 	SlotChan chan int // Post slot notifications here
 
-	ErrorThreshold int // How many failed query attempts can we tolerate before quitting?
+	LargestBlockNumberObserved int64 // This is updated by the main thread
+	LargestBlockNumberQueried  int64 // This is updated by the BlockInfo goroutine
+	LargestSlotNumberTriggered int   // This is updated by the main thread
 
-	LargestBlockHeightObserved uint64
-	LargestSlotTriggered       int
+	Once    sync.Once
+	Started bool // Dictates whether we check for equality between CurrentBlockNumber and LargestBlockNumberObserved
 
 	Invoker Invoker
 	Querier Querier
@@ -75,14 +77,14 @@ func New(blocksperslot int, clockperiod time.Duration, sleepduration time.Durati
 		SleepDuration:  sleepduration,
 		StartFromBlock: startfromblock,
 
-		BlockChan:  blockc,
-		BlockQueue: make(chan *common.Block, BufferLen),
+		BlockNumberChan: make(chan int64, BufferLen),
+		BlockChan:       blockc,
 
 		SlotChan: slotc,
 
-		ErrorThreshold: 10,
-
-		LargestSlotTriggered: -1,
+		LargestBlockNumberObserved: -1,
+		LargestBlockNumberQueried:  -1,
+		LargestSlotNumberTriggered: -1,
 
 		Invoker: invoker,
 		Querier: querier,
@@ -137,8 +139,8 @@ func (n *Notifier) Run() error {
 			select {
 			case <-n.killChan:
 				return
-			case block := <-n.BlockQueue:
-				n.RecordStats(block)
+			case blockNumber := <-n.BlockNumberChan:
+				n.GetBlock(blockNumber)
 			case <-n.DoneChan:
 				return
 			}
@@ -150,34 +152,25 @@ func (n *Notifier) Run() error {
 		case <-n.DoneChan:
 			return nil
 		default:
-			var block *common.Block
-			var err error
-
-			for i := 1; i <= n.ErrorThreshold; i++ {
-				time.Sleep(n.SleepDuration)
-				block, err = n.Querier.QueryBlock(n.LargestBlockHeightObserved + 1)
-				if err != nil {
-					msg = fmt.Sprintf("block-notifier:%02d block:%012d • error querying ledger (errcnt:%d): %s", n.StartFromBlock, n.LargestBlockHeightObserved+1, i, err.Error())
-					fmt.Fprintln(n.Writer, msg)
-					if i >= n.ErrorThreshold {
-						return err
-					}
-					time.Sleep(n.SleepDuration)
-				} else {
-					break
-				}
+			resp, err := n.Querier.QueryInfo()
+			if err != nil {
+				msg = fmt.Sprintf("block-notifier:%02d • cannot query ledger: %s", n.StartFromBlock, err.Error())
+				fmt.Fprintln(n.Writer, msg)
+				return err
 			}
 
-			// If we're here, we've successfully queried a block.
-			if inHeight := block.GetHeader().GetNumber(); inHeight > 0 {
-				if inHeight > n.LargestBlockHeightObserved {
-					n.LargestBlockHeightObserved = inHeight
-					n.BlockQueue <- block                                    // Feed that block to the stats collector
-					if int(inHeight-n.StartFromBlock)%n.BlocksPerSlot == 0 { // Is is this block marking a new slot?
-						n.LargestSlotTriggered = int(inHeight-n.StartFromBlock) / n.BlocksPerSlot
-						msg = fmt.Sprintf("block-notifier:%02d block:%012d • new slot! block corresponds to slot %012d", n.StartFromBlock, inHeight, n.LargestSlotTriggered)
+			CurrentBlockNumber := int64(resp.BCI.GetHeight() - 1)
+
+			if CurrentBlockNumber > n.LargestBlockNumberObserved {
+				n.LargestBlockNumberObserved = CurrentBlockNumber
+				n.BlockNumberChan <- n.LargestBlockNumberObserved // For stats collection
+				if n.LargestBlockNumberObserved >= int64(n.StartFromBlock) {
+					slot := int((n.LargestBlockNumberObserved - int64(n.StartFromBlock)) / int64(n.BlocksPerSlot))
+					if slot > n.LargestSlotNumberTriggered {
+						n.LargestSlotNumberTriggered = slot
+						msg = fmt.Sprintf("block-notifier:%02d block:%012d • new slot! block triggered slot %012d", n.StartFromBlock, n.LargestBlockNumberObserved, n.LargestSlotNumberTriggered)
 						fmt.Fprintln(n.Writer, msg)
-						n.SlotChan <- n.LargestSlotTriggered
+						n.SlotChan <- n.LargestSlotNumberTriggered
 					}
 				}
 			}
@@ -187,36 +180,34 @@ func (n *Notifier) Run() error {
 	}
 }
 
-// RecordStats on newly observed blocks.
-func (n *Notifier) RecordStats(block *common.Block) error {
-	height := block.GetHeader().GetNumber()
+// GetBlock gets all blocks in the (n.LargestBlockNumberQueried, blockNumber] interval and feeds them to the stats collector.
+func (n *Notifier) GetBlock(blockNumber int64) {
 	var msg string
-
-	if schema.StagingLevel <= schema.Debug {
-		msg = fmt.Sprintf("block-notifier:%02d block:%012d • block committed at the peer", n.StartFromBlock, height)
-		fmt.Fprintln(n.Writer, msg)
-	}
-
-	blockB, err := proto.Marshal(block)
-	if err != nil {
-		msg = fmt.Sprintf("block-notifier:%02d • cannot marshal block %d: %s", n.StartFromBlock, height, err.Error())
-		fmt.Fprintln(n.Writer, msg)
-		return err
-	}
-
-	blockStat := stats.Block{
-		Number: height,
-		Size:   float32(len(blockB)) / 1024, // Size in KiB
-	}
-
-	select {
-	case n.BlockChan <- blockStat:
-		if schema.StagingLevel <= schema.Debug {
-			msg = fmt.Sprintf("block-notifier:%02d block:%012d • pushed block to the stats collector (chlen:%d)", n.StartFromBlock, height, len(n.BlockChan))
+	for i := n.LargestBlockNumberQueried + 1; i <= blockNumber; i++ {
+		block, err := n.Querier.QueryBlock(uint64(i))
+		if err != nil {
+			msg = fmt.Sprintf("block-notifier:%02d block:%012d • error querying ledger: %s", n.StartFromBlock, i, err.Error())
 			fmt.Fprintln(n.Writer, msg)
+			continue
 		}
-	default:
+		blockB, err := proto.Marshal(block)
+		if err != nil {
+			msg = fmt.Sprintf("block-notifier:%02d • cannot marshal block %d: %s", n.StartFromBlock, i, err.Error())
+			fmt.Fprintln(n.Writer, msg)
+			continue
+		}
+		blockStat := stats.Block{
+			Number: uint64(i),
+			Size:   float32(len(blockB)) / 1024, // Size in KiB
+		}
+		select {
+		case n.BlockChan <- blockStat:
+			if schema.StagingLevel <= schema.Debug {
+				msg = fmt.Sprintf("block-notifier:%02d block:%012d • pushed block to the stats collector (chlen:%d)", n.StartFromBlock, i, len(n.BlockChan))
+				fmt.Fprintln(n.Writer, msg)
+			}
+		default:
+		}
 	}
-
-	return nil
+	n.LargestBlockNumberQueried = blockNumber
 }
