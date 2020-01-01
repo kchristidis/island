@@ -27,7 +27,7 @@ git clone git@github.com:kchristidis/fabric.git
 git clone git@github.com:kchristidis/island.git
 ```
 
-We assume that `fabric` lives in `$GOPATH/src/github.com/hyperledger/fabric` and `island` in `$GOPATH/src/github.com/kchristidis/island`. If that is not the case, you'll have to [edit the Vagrantfile accordingly](https://github.com/kchristidis/fabric/blob/901b8db0bb46a90cf9eb9fbb2e7cbd2fc9fcada3/devenv/Vagrantfile#L19..L20).
+We assume that the `fabric` repo cloned above lives in `$GOPATH/src/github.com/hyperledger/fabric`, and `island` lives in `$GOPATH/src/github.com/kchristidis/island`. If that is not the case, [edit the Vagrantfile accordingly](https://github.com/kchristidis/fabric/blob/901b8db0bb46a90cf9eb9fbb2e7cbd2fc9fcada3/devenv/Vagrantfile#L19..L20).
 
 Then cd into the `island` directory and:
 
@@ -50,7 +50,8 @@ cd into the `fabric` directory:
 
 ```bash
 cd devenv
-vagrant up # replace with 'vagrant ssh' in subsequent calls when the VM is up already
+vagrant up
+vagrant ssh
 ```
 
 When inside the VM:
