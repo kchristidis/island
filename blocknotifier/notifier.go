@@ -154,7 +154,7 @@ func (n *Notifier) Run() error {
 		default:
 			resp, err := n.Querier.QueryInfo()
 			if err != nil {
-				msg = fmt.Sprintf("block-notifier:%02d • cannot query ledger: %s", n.StartFromBlock, err.Error())
+				msg = fmt.Sprintf("block-notifier:%02d • cannot query info: %s", n.StartFromBlock, err.Error())
 				fmt.Fprintln(n.Writer, msg)
 				return err
 			}
@@ -186,7 +186,7 @@ func (n *Notifier) GetBlock(blockNumber int64) {
 	for i := n.LargestBlockNumberQueried + 1; i <= blockNumber; i++ {
 		block, err := n.Querier.QueryBlock(uint64(i))
 		if err != nil {
-			msg = fmt.Sprintf("block-notifier:%02d block:%012d • error querying ledger: %s", n.StartFromBlock, i, err.Error())
+			msg = fmt.Sprintf("block-notifier:%02d block:%012d • cannot query block: %s", n.StartFromBlock, i, err.Error())
 			fmt.Fprintln(n.Writer, msg)
 			continue
 		}
