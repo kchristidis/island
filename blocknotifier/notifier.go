@@ -163,7 +163,7 @@ func (n *Notifier) Run() error {
 
 			if CurrentBlockNumber > n.LargestBlockNumberObserved {
 				n.LargestBlockNumberObserved = CurrentBlockNumber
-				n.BlockNumberChan <- n.LargestBlockNumberObserved // For stats collection
+				// n.BlockNumberChan <- n.LargestBlockNumberObserved // For stats collection
 				if n.LargestBlockNumberObserved >= int64(n.StartFromBlock) {
 					slot := int((n.LargestBlockNumberObserved - int64(n.StartFromBlock)) / int64(n.BlocksPerSlot))
 					if slot > n.LargestSlotNumberTriggered {
