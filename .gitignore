@@ -1,23 +1,6 @@
-# Binaries for programs and plugins
-*.exe
-*.dll
-*.so
-*.dylib
-.vscode/*
-
-# Test binary, build with `go test -c`
-*.test
-
-# Output of the go coverage tool, specifically when used with LiteIDE
-*.out
-
-# Vendor
-vendor/*
-
-# OS-specific
 .DS_Store
-
-# Binary, trace files, results
+.vagrant/*
+.vscode/*
 island
 output/*
 trace/*.csv
