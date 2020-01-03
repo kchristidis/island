@@ -23,8 +23,8 @@ const (
 	EnableEvents  = false     // Used to enable/disable the emission of chaincode events.
 
 	// Used to collect block-indexed stats. This is gated because it requires querying every block
-	// and apparently this operation seems to eventuall result in a nil pointer dereference in the
-	// peer that ultimately kills it (and ruins your simulation). Enable with caution.
+	// and apparently this operation seems to eventually result in a nil pointer dereference in the
+	// peer that ultimately kills it (and ruins your simulation run). Enable with caution.
 	EnableBlockStatsCollection = false
 )
 

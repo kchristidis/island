@@ -78,11 +78,10 @@ sudo mkdir -p /var/hyperledger
 sudo chown -R vagrant:vagrant /var/hyperledger
 
 # Update limits.conf to increase nofiles for LevelDB and network connections
-sudo cp $GOPATH/src/github.com/kchristidis/island/fixtures/limits.conf /etc/security/limits.conf
+sudo cp $GOPATH/src/github.com/kchristidis/island/fixtures/vagrant/limits.conf /etc/security/limits.conf
 
 # Set our shell prompt to something less ugly
 cat <<EOF >> /home/vagrant/.bashrc
 cd $GOPATH/src/github.com/kchristidis/island/
-REVISION=`git rev-parse --short HEAD`
-PS1="\u@island:$REVISION:\w$ "
+PS1="\u@island:$(git rev-parse --short HEAD):\w$ "
 EOF

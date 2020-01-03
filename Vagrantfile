@@ -5,8 +5,8 @@ SRCMOUNT = "/opt/gopath/src/github.com/kchristidis/island"
 
 $inline = <<EOF
 set -x
-cd #{SRCMOUNT}/fixtures
-./vagrant-setup.sh
+cd #{SRCMOUNT}/fixtures/vagrant
+./setup.sh
 EOF
 
 Vagrant.require_version ">= 1.7.4"

@@ -30,8 +30,7 @@ cd into the `trace` directory within the `island` repo, and download `04-final-t
 cd into the root directory of `island`:
 
 ```bash
-vagrant up
-vagrant ssh
+vagrant up && vagrant ssh
 ```
 
 When inside the VM:

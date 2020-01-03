@@ -4,4 +4,5 @@
 island
 output/*
 trace/*.csv
+ubuntu-xenial-16.04-cloudimg-console.log
 volumes/*
