@@ -15,13 +15,12 @@ const (
 	ClockPeriod   = 100 * time.Millisecond // How often do we invoke the clock method to help with the creation of new blocks?
 	SleepDuration = 100 * time.Millisecond // How often do we check for new blocks?
 
-	PostKeySuffix = "privkey" // The suffix we use for the write-key in `postKey` calls. Separated with the prefix using a dash.
-	TraceLength   = 35036     // Used to size the metrics variable.
-	EnableEvents  = false     // Used to enable/disable the emission of chaincode events.
-
+	TraceLength         = 35    // How many slots do we wish to process? Max value allowed is trace.RowCount (35036).
 	StagingLevel        = Debug // Identifies the staging level for the experiment.
-	DebugTraceLength    = 35    // If in debugging mode, process only the first DebugTraceLength slots.
 	DebugBidderIDsCount = 5     // If in debugging mode, work only with the first DebugBidderIDsCount bidders in our set.
+
+	PostKeySuffix = "privkey" // The suffix we use for the write-key in `postKey` calls. Separated with the prefix using a dash.
+	EnableEvents  = false     // Used to enable/disable the emission of chaincode events.
 
 	// Used to collect block-indexed stats. This is gated because it requires querying every block
 	// and apparently this operation seems to eventuall result in a nil pointer dereference in the
