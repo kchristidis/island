@@ -94,11 +94,11 @@ In Experiment 2, we introduce the concept of a `regulator`. For a given slot, al
 
 ### Background threads
 
-The `blocknotifier` checks the height of the ledger every `schema.SleepDuration`. If the new height corresponds to a new a slot, it notifies the `slotnotifier`. The `blocknotifier` also invokes a dummy `Clock` method on the smart contract every `schema.ClockPeriod` seconds so as to ensure a continuous stream of blocks. We need this because the passage of blocks is how the agents in the simulation track time.
+The `blocknotifier` checks the ledger height every `schema.SleepDuration`. If the new height corresponds to a new a slot, it notifies the `slotnotifier`. The `blocknotifier` also invokes a dummy `Clock` method on the smart contract every `schema.ClockPeriod` seconds so as to ensure a continuous stream of blocks. We need this because the passage of blocks is how the agents in the simulation track time.
 
 The `slotnotifier` is notified by the `blocknotifier` when a new slot should be triggered, and notifies all subscribed agents (bidders and the regulator) of that event. For experiments with a separate `PostKey` phase, a second `slotnotifier` is used to signal the beginning of that phase in a given slot.
 
-The `statscollector` thread receives transaction statistics by the agents (what kind of transaction was invoked, what was its type, result, and end-to-end latency). At the end of the run, it queries the smart contract for slot statistics, and prints all statistics to files in the `output` folder; see the "Parsing the results" section for more info.
+The `statscollector` thread receives block statistics from the `blocknotifier` (what is the size of a block), and transaction statistics by the agents (what kind of transaction was invoked, what was its type, result, and end-to-end latency). At the end of the run, it queries the smart contract for slot statistics, and prints all statistics to files in the `output` folder; see the "Parsing the results" section for more info.
 
 ### Smart contract
 
@@ -152,8 +152,9 @@ To change the experiment that the simulation executes, modify `schema.ExpNum`.
 
 The program writes three files in the `output` folder:
 
-1. slot-indexed stats: `exp-MM-run-NN-slot.csv`
-2. transaction-indexed stats: `exp-MM-run-NN-tran.csv`
+1. block-indexed stats: `exp-MM-run-NN-block.csv`
+2. slot-indexed stats: `exp-MM-run-NN-slot.csv`
+3. transaction-indexed stats: `exp-MM-run-NN-tran.csv`
 
 Where:
 
@@ -162,10 +163,18 @@ Where:
 
 If you're running experiment 1 then, the first iteration of the simulation should produce the following files:
 
-1. `exp-01-run-01-slot.csv`
-2. `exp-01-run-01-tran.csv`
+1. `exp-01-run-01-block.csv`
+2. `exp-01-run-01-slot.csv`
+3. `exp-01-run-01-tran.csv`
 
 As the file extension suggests, these are comma-separated value (CSV) files.
+
+#### Block-indexed stats (optional)
+
+Values for each row in the `*-block.csv` file (type of value [in brackets]):
+
+1. `block_num` [integer] (*index*): the block under inspection.	
+2. `size_kib` [float]: the size of the block in [kibibytes](https://en.wikipedia.org/wiki/Kibibyte).
 
 #### Slot-indexed stats
 

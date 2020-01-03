@@ -22,6 +22,11 @@ const (
 	StagingLevel        = Debug // Identifies the staging level for the experiment.
 	DebugTraceLength    = 35    // If in debugging mode, process only the first DebugTraceLength slots.
 	DebugBidderIDsCount = 5     // If in debugging mode, work only with the first DebugBidderIDsCount bidders in our set.
+
+	// Used to collect block-indexed stats. This is gated because it requires querying every block
+	// and apparently this operation seems to eventuall result in a nil pointer dereference in the
+	// peer that ultimately kills it (and ruins your simulation). Enable with caution.
+	EnableBlockStatsCollection = false
 )
 
 // Level identifies a staging level.
