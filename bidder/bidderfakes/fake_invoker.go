@@ -2,10 +2,10 @@
 package bidderfakes
 
 import (
-	sync "sync"
+	"sync"
 
-	bidder "github.com/kchristidis/island/bidder"
-	schema "github.com/kchristidis/island/chaincode/schema"
+	"github.com/kchristidis/island/bidder"
+	"github.com/kchristidis/island/chaincode/schema"
 )
 
 type FakeInvoker struct {

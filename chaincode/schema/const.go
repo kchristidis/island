@@ -19,9 +19,9 @@ const (
 	TraceLength   = 35036     // Used to size the metrics variable.
 	EnableEvents  = false     // Used to enable/disable the emission of chaincode events.
 
-	StagingLevel        = Prod // Identifies the staging level for the experiment.
-	DebugTraceLength    = 35   // If in debugging mode, process only the first DebugTraceLength slots.
-	DebugBidderIDsCount = 5    // If in debugging mode, work only with the first DebugBidderIDsCount bidders in our set.
+	StagingLevel        = Debug // Identifies the staging level for the experiment.
+	DebugTraceLength    = 35    // If in debugging mode, process only the first DebugTraceLength slots.
+	DebugBidderIDsCount = 5     // If in debugging mode, work only with the first DebugBidderIDsCount bidders in our set.
 )
 
 // Level identifies a staging level.

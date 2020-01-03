@@ -2,9 +2,9 @@
 package bidderfakes
 
 import (
-	sync "sync"
+	"sync"
 
-	bidder "github.com/kchristidis/island/bidder"
+	"github.com/kchristidis/island/bidder"
 )
 
 type FakeNotifier struct {

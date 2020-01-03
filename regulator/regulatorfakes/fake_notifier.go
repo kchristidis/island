@@ -2,9 +2,9 @@
 package regulatorfakes
 
 import (
-	sync "sync"
+	"sync"
 
-	regulator "github.com/kchristidis/island/regulator"
+	"github.com/kchristidis/island/regulator"
 )
 
 type FakeNotifier struct {

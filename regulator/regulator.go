@@ -16,7 +16,7 @@ import (
 // BufferLen sets the buffer length for the slot and task channels.
 const BufferLen = 100
 
-//go:generate counterfeiter . Invoker
+//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 . Invoker
 
 // Invoker is an interface that encapsulates the
 // peer calls that are relevant to the regulator.
@@ -24,7 +24,7 @@ type Invoker interface {
 	Invoke(args schema.OpContextInput) ([]byte, error)
 }
 
-//go:generate counterfeiter . Notifier
+//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 . Notifier
 
 // Notifier is an interface that encapsulates the slot
 // notifier calls that are relevant to the regulator.

@@ -2,10 +2,10 @@
 package blocknotifierfakes
 
 import (
-	sync "sync"
+	"sync"
 
-	blocknotifier "github.com/kchristidis/island/blocknotifier"
-	schema "github.com/kchristidis/island/chaincode/schema"
+	"github.com/kchristidis/island/blocknotifier"
+	"github.com/kchristidis/island/chaincode/schema"
 )
 
 type FakeInvoker struct {

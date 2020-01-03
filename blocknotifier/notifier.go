@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/hyperledger/fabric-protos-go/common"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/ledger"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
-	"github.com/hyperledger/fabric-sdk-go/third_party/github.com/hyperledger/fabric/protos/common"
 	"github.com/kchristidis/island/chaincode/schema"
 	"github.com/kchristidis/island/stats"
 )
@@ -19,7 +19,7 @@ import (
 // BufferLen sets the buffer length for the block channel.
 const BufferLen = 100
 
-//go:generate counterfeiter . Invoker
+//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 . Invoker
 
 // Invoker is an interface that encapsulates the
 // peer calls that are relevant to the notifier.
@@ -27,7 +27,7 @@ type Invoker interface {
 	Invoke(args schema.OpContextInput) ([]byte, error)
 }
 
-//go:generate counterfeiter . Querier
+//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 . Querier
 
 // Querier is an interface that encapsulates the
 // ledger calls that are relevant to the notifier.

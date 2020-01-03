@@ -2,10 +2,10 @@
 package regulatorfakes
 
 import (
-	sync "sync"
+	"sync"
 
-	schema "github.com/kchristidis/island/chaincode/schema"
-	regulator "github.com/kchristidis/island/regulator"
+	"github.com/kchristidis/island/chaincode/schema"
+	"github.com/kchristidis/island/regulator"
 )
 
 type FakeInvoker struct {

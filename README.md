@@ -4,16 +4,15 @@ A simulator for blockchain-based local energy markets.
 
 ## Dependencies
 
-* go
-* dep
-* vagrant
+* go >= 1.13
+* vagrant >= 2.0
 * vagrant-disksize
-* virtualbox
+* virtualbox >= 6.0
 
 If you use [Homebrew](https://brew.sh/), pick up the latest versions of all of the above like so:
 
 ```bash
-brew install go dep
+brew install go
 brew cask install virtualbox vagrant
 vagrant plugin install vagrant-disksize
 ```
@@ -29,13 +28,7 @@ git clone git@github.com:kchristidis/island.git
 
 We assume that the `fabric` repo cloned above lives in `$GOPATH/src/github.com/hyperledger/fabric`, and `island` lives in `$GOPATH/src/github.com/kchristidis/island`. If that is not the case, [edit the Vagrantfile accordingly](https://github.com/kchristidis/fabric/blob/901b8db0bb46a90cf9eb9fbb2e7cbd2fc9fcada3/devenv/Vagrantfile#L19..L20).
 
-Then cd into the `island` directory and:
-
-```bash
-dep ensure
-```
-
-cd into the `trace` directory within `island`, and download `04-final-trace-2013.csv` ([link](https://drive.google.com/open?id=1snADVFVuzFOE52M9ynVvKXVvif5AJakV)) there.
+cd into the `trace` directory within the `island` repo, and download `04-final-trace-2013.csv` ([link](https://drive.google.com/open?id=1snADVFVuzFOE52M9ynVvKXVvif5AJakV)) there.
 
 Finally, cd into the `fabric` directory and:
 

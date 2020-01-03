@@ -101,7 +101,6 @@ func TestBidder(t *testing.T) {
 
 		b := bidder.New(invoker, slotnotifier0, slotnotifier1, trace.IDs[0], privkeybytes, m[trace.IDs[0]], slotc, transactionc, bfr, donec)
 
-		// var err error
 		deadc := make(chan struct{})
 		go func() {
 			err = b.Run()
@@ -111,7 +110,7 @@ func TestBidder(t *testing.T) {
 		invoker.InvokeReturns(nil, nil)
 		b.SlotQueues[0] <- slot
 
-		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say(fmt.Sprintf("slot:%012d • new slot", slot)))
+		g.Eventually(bfr, "1s", "50ms").Should(gbytes.Say(fmt.Sprintf("slot:%012d", slot)))
 
 		close(donec)
 		<-deadc
