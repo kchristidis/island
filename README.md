@@ -4,7 +4,6 @@ A simulator for blockchain-based local energy markets.
 
 ## Dependencies
 
-* go >= 1.13
 * vagrant >= 2.0
 * vagrant-disksize
 * virtualbox >= 6.0
@@ -12,37 +11,25 @@ A simulator for blockchain-based local energy markets.
 If you use [Homebrew](https://brew.sh/), pick up the latest versions of all of the above like so:
 
 ```bash
-brew install go
 brew cask install virtualbox vagrant
 vagrant plugin install vagrant-disksize
 ```
 
 ## Setup
 
-Clone the forked `fabric` repo and the `island` repo:
+Clone this repo:
 
 ```bash
-git clone git@github.com:kchristidis/fabric.git
 git clone git@github.com:kchristidis/island.git
 ```
 
-We assume that the `fabric` repo cloned above lives in `$GOPATH/src/github.com/hyperledger/fabric`, and `island` lives in `$GOPATH/src/github.com/kchristidis/island`. If that is not the case, [edit the Vagrantfile accordingly](https://github.com/kchristidis/fabric/blob/901b8db0bb46a90cf9eb9fbb2e7cbd2fc9fcada3/devenv/Vagrantfile#L19..L20).
-
 cd into the `trace` directory within the `island` repo, and download `04-final-trace-2013.csv` ([link](https://drive.google.com/open?id=1snADVFVuzFOE52M9ynVvKXVvif5AJakV)) there.
-
-Finally, cd into the `fabric` directory and:
-
-```bash
-git fetch --all
-git checkout island
-```
 
 ## Daily operation
 
-cd into the `fabric` directory:
+cd into the root directory of `island`:
 
 ```bash
-cd devenv
 vagrant up
 vagrant ssh
 ```
@@ -213,7 +200,7 @@ For practitioners that wish to understand the exact context under which a slot c
 
 ## Credits
 
-This repo began its life as a fork of the [heroes-service repo](https://github.com/chainHero/heroes-service). Experiments 2-3 make use of the composite keys iteration, initially demonstrated in the [high-throughput Fabric sample](https://github.com/hyperledger/fabric-samples/blob/ab46e3548c46acf1c541eca71914c20bbe212f6a/high-throughput/README.md).
+This repo began its life as a fork of the [heroes-service repo](https://github.com/chainHero/heroes-service). Experiments 2-3 make use of the composite keys iteration, initially demonstrated in the [high-throughput Fabric sample](https://github.com/hyperledger/fabric-samples/blob/ab46e3548c46acf1c541eca71914c20bbe212f6a/high-throughput/README.md). All Vagrant-related files were adapted from the [Fabric repo](https://github.com/hyperledger/fabric).
 
 ## Contributing
 
