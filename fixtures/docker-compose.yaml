@@ -25,6 +25,9 @@ services:
       - ../volumes/orderer:/var/hyperledger/production/orderer
     ports:
       - 7050:7050
+    logging:
+      options:
+        max-size: 100m
 
   peer0.clark.example.com:
     container_name: peer0.clark.example.com
@@ -56,6 +59,9 @@ services:
     ports:
       - 7051:7051
       - 7053:7053
+    logging:
+      options:
+        max-size: 100m
     depends_on:
       - joe.example.com
     links:
