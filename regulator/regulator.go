@@ -169,6 +169,7 @@ func (r *Regulator) Run() error {
 						Type:            "markEnd",
 						Status:          err.Error(),
 						LatencyInMillis: elapsed,
+						Attempt:         1, // TODO: Implement retries
 					}
 					msg := fmt.Sprintf("regulator event_id:%s slot:%012d • failure! cannot invoke 'markEnd': %s\n", eventID, slot, err)
 					r.ErrChan <- errors.New(msg)
