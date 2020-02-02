@@ -207,7 +207,8 @@ func metrics() error {
 			dmiQtyVal, dmiPpuVal,
 			lateAllVal, lateBuyVal, lateSellVal,
 			lateDecrVal,
-			probIterVal, probMarVal, probDecrVal, probBidCalcVal,
+			probIterVal, probMarVal,
+			probDecrVal, probBidCalcVal,
 			probKeyVal, probGetVal, probPutVal,
 		)
 		fmt.Fprintln(writer, msg)
@@ -218,7 +219,8 @@ func metrics() error {
 			dmiQtyVal, dmiPpuVal,
 			lateAllVal, lateBuyVal, lateSellVal,
 			lateDecrVal,
-			probIterVal, probMarVal, probDecrVal,
+			probIterVal, probMarVal,
+			probDecrVal, probBidCalcVal,
 			probKeyVal, probGetVal, probPutVal}); err != nil {
 			return err
 		}
