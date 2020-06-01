@@ -1,5 +1,7 @@
 # island
 
+[![DOI](https://zenodo.org/badge/157996149.svg)](https://zenodo.org/badge/latestdoi/157996149)
+
 A simulator for blockchain-based local energy markets.
 
 ## Dependencies
